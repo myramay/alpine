@@ -4,54 +4,94 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Alpine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Faculty+Glyphic&display=swap" rel="stylesheet">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Cpath d=%27M4 26 L16 6 L28 26 Z%27 fill=%27%23f2a93b%27/%3E%3C/svg%3E">
 <style>
-  :root { --bg:#0f1115; --panel:#171a21; --line:#2a2f3a; --ink:#e8eaf0; --muted:#8b93a7; --accent:#f2a93b; --good:#58c48b; --bad:#e5655a;
-          --sell:#58c48b; --store:#6ea8fe; --dry:#8b93a7; --tower:#e5655a; --water:#4cc3e6; --mono: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  :root { --bg:#09090b; --panel:#0f0f12; --panel2:#131317; --line:#27272a; --line2:#3f3f46; --ink:#fafafa; --muted:#a1a1aa; --dim:#71717a;
+          --accent:#f2a93b; --good:#34d399; --bad:#f87171;
+          --sell:#34d399; --store:#60a5fa; --dry:#a1a1aa; --tower:#f87171; --water:#22d3ee;
+          --mono: "Faculty Glyphic", ui-monospace, SFMono-Regular, Menlo, monospace; --sans: "Faculty Glyphic", system-ui, -apple-system, "Segoe UI", sans-serif; --code: ui-monospace, SFMono-Regular, Menlo, monospace; }
   * { box-sizing:border-box; }
-  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.45 system-ui, -apple-system, Segoe UI, sans-serif; }
-  header { display:flex; align-items:center; gap:16px; padding:16px 24px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
-  header h1 { margin:0; font-size:20px; letter-spacing:.02em; }
-  header .sub { color:var(--muted); font-size:14px; }
-  header .right { margin-left:auto; display:flex; gap:10px; align-items:center; font-size:13px; color:var(--muted); }
-  select { background:var(--panel); color:var(--ink); border:1px solid var(--line); border-radius:8px; padding:6px 10px; font-size:14px; }
-  .dot { width:8px; height:8px; border-radius:50%; background:var(--bad); display:inline-block; }
-  .dot.ok { background:var(--good); }
-  nav { display:flex; gap:4px; padding:12px 24px 0; }
-  nav button { background:none; border:1px solid var(--line); color:var(--muted); padding:8px 14px; border-radius:8px 8px 0 0; cursor:pointer; font-size:14px; }
-  nav button.on { color:var(--ink); border-bottom-color:var(--panel); background:var(--panel); }
-  main { padding:0 24px 40px; }
-  section { display:none; background:var(--panel); border:1px solid var(--line); border-radius:0 12px 12px 12px; padding:24px; }
+  html { background:var(--bg); }
+  body { margin:0; color:var(--ink); font:15px/1.5 var(--sans); background:
+    radial-gradient(circle at 1px 1px, #1c1c21 1px, transparent 0) 0 0/24px 24px, var(--bg); -webkit-font-smoothing:antialiased; }
+  header { display:flex; align-items:center; gap:14px; padding:14px 24px; border-bottom:1px solid var(--line); background:rgba(9,9,11,.8); backdrop-filter:blur(8px); position:sticky; top:0; z-index:5; flex-wrap:wrap; }
+  header h1 { margin:0; font-size:15px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; }
+  header h1::before { content:""; display:inline-block; width:0; height:0; border-left:7px solid transparent; border-right:7px solid transparent; border-bottom:12px solid var(--accent); margin-right:10px; vertical-align:-1px; }
+  header .sub { color:var(--dim); font-family:var(--mono); font-size:12px; letter-spacing:.04em; }
+  header .right { margin-left:auto; display:flex; gap:14px; align-items:center; font-family:var(--mono); font-size:12px; color:var(--muted); }
+  select { background:var(--panel); color:var(--ink); border:1px solid var(--line2); border-radius:6px; padding:6px 10px; font:12px var(--mono); }
+  .dot { width:7px; height:7px; border-radius:50%; background:var(--bad); display:inline-block; box-shadow:0 0 8px var(--bad); }
+  .dot.ok { background:var(--good); box-shadow:0 0 8px var(--good); }
+  nav { display:flex; gap:2px; padding:16px 24px 0; }
+  nav button { background:none; border:0; border-bottom:2px solid transparent; color:var(--dim); padding:8px 12px; cursor:pointer; font:12px var(--mono); letter-spacing:.12em; text-transform:uppercase; }
+  nav button.on { color:var(--ink); border-bottom-color:var(--accent); }
+  main { padding:16px 24px 48px; }
+  section { display:none; }
   section.on { display:block; }
-  h2 { font-size:15px; color:var(--muted); font-weight:500; text-transform:uppercase; letter-spacing:.08em; margin:28px 0 12px; }
+  h2 { font:12px var(--mono); color:var(--dim); font-weight:500; text-transform:uppercase; letter-spacing:.16em; margin:28px 0 12px; }
   h2:first-child { margin-top:0; }
-  .metrics { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px,1fr)); gap:16px; }
-  .metric { border:1px solid var(--line); border-radius:12px; padding:18px; }
-  .metric .name { color:var(--muted); font-size:13px; text-transform:uppercase; letter-spacing:.08em; }
-  .metric .value { font-size:40px; font-weight:600; margin:6px 0 2px; }
-  .metric .unit { color:var(--muted); font-size:13px; }
-  .metric .meaning { margin-top:10px; font-size:14px; }
-  .query { margin-top:12px; font-family:var(--mono); font-size:12.5px; color:var(--muted); background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:10px; white-space:pre-wrap; word-break:break-word; }
+  /* corner-frame tiles */
+  .frame { position:relative; border:1px solid var(--line); background:var(--panel); padding:18px 20px; }
+  .frame::before, .frame::after, .frame > .c::before, .frame > .c::after { content:""; position:absolute; width:12px; height:12px; border-color:var(--line2); border-style:solid; }
+  .frame::before { top:-1px; left:-1px; border-width:1px 0 0 1px; } .frame::after { top:-1px; right:-1px; border-width:1px 1px 0 0; }
+  .frame > .c::before { bottom:-1px; left:-1px; border-width:0 0 1px 1px; } .frame > .c::after { bottom:-1px; right:-1px; border-width:0 1px 1px 0; }
+  .frame.hot::before, .frame.hot::after, .frame.hot > .c::before, .frame.hot > .c::after { border-color:var(--accent); }
+  .metrics { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px,1fr)); gap:12px; }
+  .metric .name { font:11px var(--mono); color:var(--dim); text-transform:uppercase; letter-spacing:.18em; }
+  .metric .value { font-size:44px; font-weight:600; letter-spacing:-.02em; margin:4px 0 0; font-variant-numeric:tabular-nums; line-height:1.1; }
+  .metric .unit { font:11px var(--mono); color:var(--dim); margin-top:2px; }
+  .metric .meaning { margin-top:12px; font-size:13px; color:var(--muted); }
+  .query { margin-top:12px; font:11.5px/1.5 var(--code); color:var(--dim); background:var(--bg); border:1px solid var(--line); padding:10px; white-space:pre-wrap; word-break:break-word; }
   form { display:flex; gap:10px; }
-  input[type=text] { flex:1; background:var(--bg); border:1px solid var(--line); color:var(--ink); padding:12px 14px; border-radius:10px; font-size:16px; }
-  button.go { background:var(--accent); color:#1a1200; border:0; padding:10px 16px; border-radius:10px; font-weight:600; cursor:pointer; font-size:14px; }
+  input[type=text] { flex:1; background:var(--panel); border:1px solid var(--line2); color:var(--ink); padding:12px 14px; font:15px var(--sans); }
+  input[type=text]:focus { outline:none; border-color:var(--accent); }
+  button.go { background:var(--accent); color:#1a1200; border:0; padding:10px 16px; font:12px var(--mono); letter-spacing:.1em; text-transform:uppercase; font-weight:700; cursor:pointer; }
   button.go[disabled] { opacity:.5; cursor:wait; }
   .answer { margin-top:18px; font-size:20px; }
   .examples { margin-top:14px; display:flex; flex-wrap:wrap; gap:8px; }
-  .examples button { background:none; border:1px solid var(--line); color:var(--muted); padding:6px 10px; border-radius:999px; font-size:13px; cursor:pointer; }
-  table { width:100%; border-collapse:collapse; font-size:14px; }
-  th, td { text-align:left; padding:9px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
-  th { color:var(--muted); font-weight:500; font-size:13px; }
-  td.n, th.n { text-align:right; font-variant-numeric:tabular-nums; }
-  td.q { font-family:var(--mono); font-size:12.5px; color:var(--muted); }
-  .pill { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; border:1px solid var(--line); }
+  .examples button { background:none; border:1px solid var(--line); color:var(--muted); padding:6px 10px; font:12px var(--mono); cursor:pointer; }
+  .examples button:hover { border-color:var(--line2); color:var(--ink); }
+  table { width:100%; border-collapse:collapse; font-size:13.5px; }
+  th, td { text-align:left; padding:9px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { font:11px var(--mono); color:var(--dim); text-transform:uppercase; letter-spacing:.14em; font-weight:500; }
+  td.n, th.n { text-align:right; font-variant-numeric:tabular-nums; font-family:var(--mono); font-size:12.5px; }
+  td.q { font-family:var(--code); font-size:12px; color:var(--dim); }
+  .pill { display:inline-block; padding:2px 8px; font:11px var(--mono); border:1px solid var(--line2); text-transform:uppercase; letter-spacing:.08em; }
   .pill.good { color:var(--good); border-color:var(--good); }
-  .status { color:var(--muted); font-size:13px; margin-top:10px; }
+  .status { color:var(--dim); font:12px var(--mono); margin-top:10px; }
   .err { color:var(--bad); }
   .chart { width:100%; height:auto; display:block; }
-  .legend { display:flex; gap:16px; flex-wrap:wrap; font-size:13px; color:var(--muted); margin-top:8px; }
-  .legend i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:6px; vertical-align:-1px; }
+  .legend { display:flex; gap:16px; flex-wrap:wrap; font:11.5px var(--mono); color:var(--dim); margin-top:8px; }
+  .legend i, .keys i { display:inline-block; width:8px; height:8px; margin-right:6px; vertical-align:0; }
   .pos { color:var(--bad); } .neg { color:var(--good); }
+  /* site bento */
+  .bento { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:12px; }
+  @media (max-width: 980px) { .bento { grid-template-columns:1fr; } }
+  .scene-wrap { position:relative; border:1px solid var(--line); overflow:hidden; background:#0a0a0d; }
+  #scene { width:100%; height:560px; display:block; }
+  .hud { position:absolute; left:16px; right:16px; bottom:14px; display:flex; flex-direction:column; gap:8px; pointer-events:none; }
+  .hud-row { display:flex; gap:12px; align-items:center; pointer-events:auto; }
+  .hud-row input[type=range] { flex:1; accent-color:var(--accent); }
+  .hud-row span { font:12px var(--mono); color:var(--ink); min-width:56px; }
+  .hud-stats { display:none; }
+  .keys { position:absolute; top:12px; left:16px; display:flex; gap:14px; flex-wrap:wrap; font:11px var(--mono); color:var(--dim); letter-spacing:.06em; }
+  .side { display:flex; flex-direction:column; gap:12px; }
+  .side .frame { padding:14px 16px; }
+  .kv { display:flex; justify-content:space-between; align-items:baseline; padding:6px 0; border-bottom:1px solid var(--line); }
+  .kv:last-child { border-bottom:0; }
+  .kv .k { font:11px var(--mono); color:var(--dim); text-transform:uppercase; letter-spacing:.14em; }
+  .kv .v { font:600 20px var(--sans); font-variant-numeric:tabular-nums; letter-spacing:-.01em; }
+  .kv .v small { font:11px var(--mono); color:var(--dim); margin-left:4px; }
+  .bar { height:4px; background:var(--line); margin-top:6px; overflow:hidden; }
+  .bar i { display:block; height:100%; background:var(--accent); width:0; transition:width .25s; }
+  .sky-bar { display:flex; gap:14px; align-items:center; margin-bottom:10px; font:12px var(--mono); color:var(--muted); }
+  .sky-wrap { position:relative; }
+  #skyline { width:100%; height:400px; display:block; cursor:crosshair; }
+  .tip { display:none; position:absolute; background:#18181b; border:1px solid var(--line2); padding:8px 10px; font:12px var(--mono); color:var(--ink); pointer-events:none; white-space:nowrap; z-index:2; }
+  .sky-stats { display:flex !important; gap:18px; flex-wrap:wrap; font:12px var(--mono); color:var(--dim); margin-top:8px; }
+  .sky-stats b { color:var(--ink); }
 </style>
 </head>
 <body>
@@ -64,17 +104,67 @@
   </div>
 </header>
 <nav>
-  <button class="on" data-tab="report">Report</button>
+  <button class="on" data-tab="site">Site</button>
+  <button data-tab="report">Report</button>
   <button data-tab="ask">Ask</button>
   <button data-tab="decisions">Decisions</button>
   <button data-tab="model">Model</button>
 </nav>
 <main>
-  <section id="report" class="on">
+  <section id="site" class="on">
+    <div class="bento">
+      <div class="scene-wrap">
+        <canvas id="scene"></canvas>
+        <div class="hud">
+          <div class="hud-row"><button class="go" id="play">Play</button><input type="range" id="day" min="0" max="364" value="0"><span id="day-label">Jan 1</span></div>
+          <div class="hud-stats" id="hud-stats"></div>
+        </div>
+        <div class="keys">
+          <span><i style="background:var(--sell)"></i>to network</span>
+          <span><i style="background:var(--store)"></i>pit</span>
+          <span><i style="background:var(--dry)"></i>dry</span>
+          <span><i style="background:var(--tower)"></i>towers · plume = water</span>
+        </div>
+      </div>
+      <div class="side" id="side">
+        <div class="frame hot"><span class="c"></span>
+          <div class="metric"><div class="name">Today</div><div class="value" id="s-day">—</div><div class="unit" id="s-scen">normal</div></div>
+        </div>
+        <div class="frame"><span class="c"></span>
+          <div class="kv"><span class="k">heat captured</span><span class="v" id="s-heat">—<small>MW</small></span></div>
+          <div class="kv"><span class="k">to network</span><span class="v" id="s-sell">—<small>MW</small></span></div>
+          <div class="kv"><span class="k">dry coolers</span><span class="v" id="s-dry">—<small>MW</small></span></div>
+          <div class="kv"><span class="k">towers</span><span class="v" id="s-tower">—<small>MW</small></span></div>
+        </div>
+        <div class="frame"><span class="c"></span>
+          <div class="kv"><span class="k">water today</span><span class="v" id="s-water">—<small>gal</small></span></div>
+          <div class="bar"><i id="s-water-bar"></i></div>
+          <div class="kv" style="margin-top:8px"><span class="k">pit level</span><span class="v" id="s-pit">—<small>%</small></span></div>
+          <div class="bar"><i id="s-pit-bar" style="background:var(--store)"></i></div>
+          <div class="kv" style="margin-top:8px"><span class="k">net cost</span><span class="v" id="s-cost">—<small>/day</small></span></div>
+        </div>
+      </div>
+    </div>
+    <div class="status" id="site-status">Loading the year…</div>
+  </section>
+
+  <section id="report">
     <div class="metrics" id="metrics"></div>
     <div class="status" id="report-status">Loading…</div>
 
+    <h2>The year as a skyline: one block per day</h2>
+    <div class="frame"><span class="c"></span>
+      <div class="sky-bar">
+        <label>Metric <select id="sky-metric"><option value="water_gal">water (gal)</option><option value="heat_exported_mw">heat sold (MWh)</option><option value="heat_tower_mw">towers (MWh)</option><option value="cost_usd">net cost ($)</option></select></label>
+        <button class="go" id="sky-3d">Flat</button>
+        <span class="status" style="margin:0">drag sideways to rotate · hover a day</span>
+      </div>
+      <div class="sky-wrap"><canvas id="skyline"></canvas><div id="sky-tip" class="tip"></div></div>
+      <div class="hud-stats sky-stats" id="sky-stats"></div>
+    </div>
+
     <h2>Day by day: where the heat went, and the water it cost</h2>
+    <div class="frame"><span class="c"></span>
     <svg id="daily" class="chart" viewBox="0 0 960 300" role="img" aria-label="Daily heat split and water use"></svg>
     <div class="legend">
       <span><i style="background:var(--sell)"></i>sold to the network</span>
@@ -84,14 +174,18 @@
       <span><i style="background:var(--water)"></i>water, gal/day (line, right axis)</span>
     </div>
     <div class="status" id="daily-status"></div>
+    </div>
 
     <h2>The agent's lever: towers vs. dry condensers on the chillers, same year</h2>
+    <div class="frame"><span class="c"></span>
     <table><thead><tr><th>Metric</th><th class="n">Towers (default)</th><th class="n">Dry condensers</th><th class="n">Change</th></tr></thead>
       <tbody id="compare-body"></tbody></table>
     <div class="status" id="compare-status">Loading…</div>
+    </div>
   </section>
 
   <section id="ask">
+    <div class="frame"><span class="c"></span>
     <form id="ask-form">
       <input type="text" id="q" placeholder="Ask the site anything about this year…" autocomplete="off">
       <button class="go" id="go">Ask</button>
@@ -100,12 +194,15 @@
     <div class="answer" id="answer"></div>
     <div class="query" id="answer-query" style="display:none"></div>
     <div class="status" id="ask-status"></div>
+    </div>
   </section>
 
   <section id="decisions">
+    <div class="frame"><span class="c"></span>
     <table><thead><tr><th>Day</th><th>Asked</th><th>Answer</th><th>Decision</th></tr></thead>
       <tbody id="decisions-body"></tbody></table>
     <div class="status" id="decisions-status">Loading…</div>
+    </div>
   </section>
 
   <section id="model">
@@ -117,6 +214,9 @@
   </section>
 </main>
 
+<script type="importmap">{"imports":{"three":"./vendor/three.module.min.js"}}</script>
+<script type="module" src="site.js"></script>
+<script src="skyline.js" defer></script>
 <script>
 const API_BASE = (new URLSearchParams(location.search).get('api')) || window.API_BASE || (location.protocol.startsWith('http') ? location.origin : 'http://localhost:8000');
 document.getElementById('api-label').textContent = API_BASE.replace(/^https?:\/\//, '');
@@ -178,8 +278,9 @@ function renderReport(run) {
     { name:'ERF', value:s.erf, unit:'heat reused / energy in', query:q('sum(heat_exported_mw) / (sum(power_kwh) / 1000)') },
   ];
   el.innerHTML = metrics.map(m => `
-    <div class="metric"><div class="name">${m.name}</div><div class="value">${fmt(m.value)}</div><div class="unit">${m.unit}</div>
+    <div class="frame metric"><span class="c"></span><div class="name">${m.name}</div><div class="value" data-count="${m.value}">${fmt(m.value)}</div><div class="unit">${m.unit}</div>
     <div class="meaning">${MEANING[m.name]}</div><div class="query">${esc(m.query)}</div></div>`).join('');
+  countUp(el);
   document.getElementById('report-status').textContent =
     `${run.scenario.replace('_',' ')} · ${fmt(s.heat_available_gwh)} GWh captured, ${fmt(s.heat_exported_gwh)} GWh sold, ${fmt(s.water_mgal)} Mgal water, $${fmt(s.cost_musd)}M net cost, ${fmt(s.co2_kt)} kt CO2 · computed ${run.computed_at}`;
   loadLiveReport(run);
@@ -205,6 +306,7 @@ async function loadDaily(run_id) {
   try {
     const d = await get(`/events?run_id=${encodeURIComponent(run_id)}&daily=1`);
     drawDaily(svg, d.rows);
+    window.dispatchEvent(new CustomEvent('alpine:daily', { detail: { rows: d.rows, run: RUNS.current } }));
     const peak = d.rows.reduce((a, r) => r.water_gal > a.water_gal ? r : a, d.rows[0]);
     st.textContent = `${d.rows.length} days, ${(d.rows.length * 24).toLocaleString()} simulated hours · peak water day ${peak.day} at ${Math.round(peak.water_gal).toLocaleString()} gal`;
   } catch (e) { st.innerHTML = `<span class="err">${esc(e.message)}</span>`; }
@@ -287,6 +389,21 @@ async function ask() {
   go.disabled = false;
 }
 
+function countUp(root) {
+  root.querySelectorAll('[data-count]').forEach(el => {
+    const target = +el.dataset.count, t0 = performance.now(), dur = 700;
+    const step = now => { const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 3); el.textContent = fmt(target * e); if (k < 1) requestAnimationFrame(step); };
+    requestAnimationFrame(step);
+  });
+}
+window.addEventListener('alpine:day', e => {
+  const r = e.detail.row, m = e.detail.max, set = (id, v) => { const el = document.getElementById(id); if (el) el.firstChild.textContent = v; };
+  document.getElementById('s-day').textContent = e.detail.label; document.getElementById('s-scen').textContent = r.scenario.replace('_', ' ');
+  document.getElementById('side').querySelector('.frame').classList.toggle('hot', r.scenario !== 'normal');
+  set('s-heat', (r.heat_available_mw / 24).toFixed(0)); set('s-sell', (r.heat_exported_mw / 24).toFixed(0)); set('s-dry', (r.dry_mw / 24).toFixed(0)); set('s-tower', (r.heat_tower_mw / 24).toFixed(0));
+  set('s-water', Math.round(r.water_gal).toLocaleString()); set('s-pit', Math.round(r.storage_soc * 100)); set('s-cost', '$' + Math.round(r.cost_usd / 1000) + 'k');
+  document.getElementById('s-water-bar').style.width = (100 * r.water_gal / m.water) + '%'; document.getElementById('s-pit-bar').style.width = (100 * r.storage_soc) + '%';
+});
 function fmt(v) { if (v == null) return '—'; if (Math.abs(v) >= 1000) return Math.round(v).toLocaleString(); if (Math.abs(v) >= 100) return v.toFixed(0); if (Math.abs(v) >= 10) return v.toFixed(1); return (Math.round(v * 1000) / 1000).toString(); }
 function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 init();

@@ -36,7 +36,7 @@ DEFAULT_POLICY = {"prefer_dry": False, "storage_reserve": 0.2, "tower_cap_mw": 1
 DRY_DERATE_START_C, DRY_DERATE_END_C = 25.0, 35.0   # dry condenser capacity fades to zero across this ambient range; assumption - verify
 
 EVENT_NAMES = [
-    "heat_available_mw", "heat_exported_mw", "heat_stored_mw", "heat_rejected_mw", "heat_tower_mw",
+    "heat_available_mw", "heat_exported_mw", "heat_stored_mw", "heat_rejected_mw", "heat_tower_mw", "heat_dry_mw",
     "water_gal", "power_kwh", "it_kwh", "cost_usd", "co2_t", "decision", "storage_soc",
 ]
 BOILER_EFF = 0.85  # gas boiler efficiency the delivered heat replaces; assumption - verify
@@ -67,9 +67,13 @@ def run(scenario: str = "normal", push: bool = True, policy: dict | None = None,
         policy_by_day: dict[int, dict] | None = None, policy_notes: dict[int, str] | None = None,
         run_id: str | None = None, save: bool | None = None) -> dict:
     """Simulate a typical year. policy_by_day lets agent.py change the policy from a given day on;
-    policy_notes (day -> reason) become policy_change events in Keewano. save (default: same as push)
-    also writes outputs/runs/<run_id>.csv + index.json, which agent.py and /ask read; what-if calls
-    (/compare, /sensitivity) leave it off so they don't show up as Keewano runs."""
+    policy_notes (day -> reason) become policy_change events in Keewano.
+
+    What gets written:
+      out/run_<id>.json + out/events_<id>.csv   (the web page's runs)        unless save=False
+      outputs/runs/<id>.csv + index.json        (runs that exist in Keewano) when pushed, or save=True
+    save=None (default) means "same as push" for the Keewano index. What-if calls (/compare,
+    /sensitivity, tests) pass save=False so nothing is written and nothing shows up as a run."""
     df = load_inputs()
     c, hn, st, pr, em = CFG["cooling"], CFG["heat_network"], CFG["storage"], CFG["prices"], CFG["emissions"]
     dc = CFG["data_center"]
@@ -152,7 +156,7 @@ def run(scenario: str = "normal", push: bool = True, policy: dict | None = None,
                 "run_id": run_id}
         vals = {
             "heat_available_mw": avail, "heat_exported_mw": export, "heat_stored_mw": store - discharge,
-            "heat_rejected_mw": reject, "heat_tower_mw": tower_total, "water_gal": water_gal, "power_kwh": power_kwh, "it_kwh": it_kwh,
+            "heat_rejected_mw": reject, "heat_tower_mw": tower_total, "heat_dry_mw": dry + cond_dry, "water_gal": water_gal, "power_kwh": power_kwh, "it_kwh": it_kwh,
             "cost_usd": cost, "co2_t": co2, "decision": decision, "storage_soc": soc,
         }
         events.extend({"name": n, "value": (round(v, 4) if isinstance(v, float) else v), "tags": tags}
@@ -201,12 +205,13 @@ def run(scenario: str = "normal", push: bool = True, policy: dict | None = None,
         "hours_pit_empty": int(tot["hours_pit_empty"]),
         "hours_unmet_demand": int(tot["hours_unmet"]),
     }
-    out = Path("out"); out.mkdir(exist_ok=True)
-    (out / f"run_{run_id}.json").write_text(json.dumps({
-        "run_id": run_id, "scenario": scenario, "policy": pol,
-        "computed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "summary": summary}, indent=2))
-    pd.DataFrame([{"name": e["name"], "value": e["value"], **e["tags"]} for e in events]) \
-        .to_csv(out / f"events_{run_id}.csv", index=False)
+    if save is not False:
+        out = Path("out"); out.mkdir(exist_ok=True)
+        (out / f"run_{run_id}.json").write_text(json.dumps({
+            "run_id": run_id, "scenario": scenario, "policy": pol,
+            "computed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "summary": summary}, indent=2))
+        pd.DataFrame([{"name": e["name"], "value": e["value"], **e["tags"]} for e in events]) \
+            .to_csv(out / f"events_{run_id}.csv", index=False)
 
     kw_run = keewano_run(kw_rows, run_id, scenario, policy_notes)
     if push if save is None else save:

@@ -10,7 +10,7 @@ runs:
 
 # all four scenarios, then the API; open web/index.html (or web/index.html?api=http://localhost:8000)
 demo: runs
-	uvicorn server:app --port 8000
+	$(PY) -m uvicorn server:app --port 8000
 
 test:
 	$(PY) -m pytest -q
