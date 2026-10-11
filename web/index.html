@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Alpine</title>
+<style>
+  :root { --bg:#0f1115; --panel:#171a21; --line:#2a2f3a; --ink:#e8eaf0; --muted:#8b93a7; --accent:#f2a93b; --good:#58c48b; --bad:#e5655a; --mono: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.45 system-ui, -apple-system, Segoe UI, sans-serif; }
+  header { display:flex; align-items:baseline; gap:16px; padding:20px 24px; border-bottom:1px solid var(--line); }
+  header h1 { margin:0; font-size:20px; letter-spacing:.02em; }
+  header .sub { color:var(--muted); font-size:14px; }
+  header .run { margin-left:auto; color:var(--muted); font-family:var(--mono); font-size:13px; }
+  nav { display:flex; gap:4px; padding:12px 24px 0; }
+  nav button { background:none; border:1px solid var(--line); color:var(--muted); padding:8px 14px; border-radius:8px 8px 0 0; cursor:pointer; font-size:14px; }
+  nav button.on { color:var(--ink); border-bottom-color:var(--panel); background:var(--panel); }
+  main { padding:0 24px 40px; }
+  section { display:none; background:var(--panel); border:1px solid var(--line); border-radius:0 12px 12px 12px; padding:24px; }
+  section.on { display:block; }
+  .metrics { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px,1fr)); gap:16px; }
+  .metric { border:1px solid var(--line); border-radius:12px; padding:18px; }
+  .metric .name { color:var(--muted); font-size:13px; text-transform:uppercase; letter-spacing:.08em; }
+  .metric .value { font-size:40px; font-weight:600; margin:6px 0 2px; }
+  .metric .unit { color:var(--muted); font-size:13px; }
+  .metric .meaning { margin-top:10px; font-size:14px; }
+  .query { margin-top:12px; font-family:var(--mono); font-size:12.5px; color:var(--muted); background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:10px; white-space:pre-wrap; word-break:break-word; }
+  form { display:flex; gap:10px; }
+  input[type=text] { flex:1; background:var(--bg); border:1px solid var(--line); color:var(--ink); padding:12px 14px; border-radius:10px; font-size:16px; }
+  button.go { background:var(--accent); color:#1a1200; border:0; padding:12px 18px; border-radius:10px; font-weight:600; cursor:pointer; }
+  button.go[disabled] { opacity:.5; cursor:wait; }
+  .answer { margin-top:18px; font-size:20px; }
+  .examples { margin-top:14px; display:flex; flex-wrap:wrap; gap:8px; }
+  .examples button { background:none; border:1px solid var(--line); color:var(--muted); padding:6px 10px; border-radius:999px; font-size:13px; cursor:pointer; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th, td { text-align:left; padding:10px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--muted); font-weight:500; font-size:13px; }
+  td.q { font-family:var(--mono); font-size:12.5px; color:var(--muted); }
+  .pill { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; border:1px solid var(--line); }
+  .pill.good { color:var(--good); border-color:var(--good); }
+  .pill.bad { color:var(--bad); border-color:var(--bad); }
+  .status { color:var(--muted); font-size:13px; margin-top:10px; }
+  .err { color:var(--bad); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Alpine</h1>
+  <span class="sub">the thermal layer · Lake Hawkeye, Lansing NY · 100 MW IT</span>
+  <span class="run" id="run">run: —</span>
+</header>
+<nav>
+  <button class="on" data-tab="report">Report</button>
+  <button data-tab="ask">Ask</button>
+  <button data-tab="decisions">Decisions</button>
+</nav>
+<main>
+  <section id="report" class="on">
+    <div class="metrics" id="metrics"></div>
+    <div class="status" id="report-status">Loading…</div>
+  </section>
+
+  <section id="ask">
+    <form id="ask-form">
+      <input type="text" id="q" placeholder="Ask the site anything about this year…" autocomplete="off">
+      <button class="go" id="go">Ask</button>
+    </form>
+    <div class="examples" id="examples"></div>
+    <div class="answer" id="answer"></div>
+    <div class="query" id="answer-query" style="display:none"></div>
+    <div class="status" id="ask-status"></div>
+  </section>
+
+  <section id="decisions">
+    <table>
+      <thead><tr><th>Day</th><th>Asked</th><th>Answer</th><th>Decision</th></tr></thead>
+      <tbody id="decisions-body"></tbody>
+    </table>
+    <div class="status" id="decisions-status">Loading…</div>
+  </section>
+</main>
+
+<script>
+const API_BASE = (new URLSearchParams(location.search).get('api')) || window.API_BASE || 'http://localhost:8000';
+
+const EXAMPLES = [
+  'What was the PUE for the year?',
+  'How many gallons of water did the site use in the heat wave?',
+  'What share of the heat was reused in January?',
+  'How many hours was the pit empty?',
+  'Which hour had the highest cost, and why?',
+];
+
+const MEANING = {
+  PUE: 'Total facility energy per unit of IT energy. Lower is better; liquid cooling plus heat export keeps it near 1.1.',
+  WUE: 'Litres of water per IT kWh. This is the number the town asks about: every hour on towers raises it, every hour selling or storing heat lowers it.',
+  ERF: 'Share of energy reused as heat. Germany requires 10% from July 2026, 20% by 2028, for new data centers.',
+};
+
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('nav button').forEach(x => x.classList.toggle('on', x === b));
+  document.querySelectorAll('main section').forEach(s => s.classList.toggle('on', s.id === b.dataset.tab));
+});
+
+async function get(path, opts) {
+  const r = await fetch(API_BASE + path, opts);
+  if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
+  return r.json();
+}
+
+async function loadReport() {
+  const el = document.getElementById('metrics'), st = document.getElementById('report-status');
+  try {
+    const d = await get('/report');
+    document.getElementById('run').textContent = 'run: ' + (d.run_id || '—');
+    el.innerHTML = d.metrics.map(m => `
+      <div class="metric">
+        <div class="name">${m.name}</div>
+        <div class="value">${fmt(m.value)}</div>
+        <div class="unit">${m.unit || ''}</div>
+        <div class="meaning">${MEANING[m.name] || ''}</div>
+        <div class="query">${esc(m.query)}</div>
+      </div>`).join('');
+    st.textContent = d.cached ? 'Cached from the last query · ' + d.computed_at : 'Computed live by Keewano · ' + d.computed_at;
+  } catch (e) { st.innerHTML = `<span class="err">Report unavailable: ${esc(e.message)}</span>`; }
+}
+
+async function loadDecisions() {
+  const body = document.getElementById('decisions-body'), st = document.getElementById('decisions-status');
+  try {
+    const d = await get('/decisions');
+    body.innerHTML = d.decisions.map(x => `
+      <tr><td>${x.day}</td><td class="q">${esc(x.question)}</td><td>${esc(x.answer)}</td>
+      <td><span class="pill ${x.changed ? 'good' : ''}">${esc(x.decision)}</span></td></tr>`).join('');
+    st.textContent = d.decisions.length ? `${d.decisions.length} daily decisions` : 'No decisions yet. Run agent.py.';
+  } catch (e) { st.innerHTML = `<span class="err">Decisions unavailable: ${esc(e.message)}</span>`; }
+}
+
+document.getElementById('examples').innerHTML = EXAMPLES.map(q => `<button type="button">${esc(q)}</button>`).join('');
+document.querySelectorAll('#examples button').forEach(b => b.onclick = () => { document.getElementById('q').value = b.textContent; ask(); });
+document.getElementById('ask-form').onsubmit = e => { e.preventDefault(); ask(); };
+
+async function ask() {
+  const q = document.getElementById('q').value.trim(); if (!q) return;
+  const go = document.getElementById('go'), ans = document.getElementById('answer'), qq = document.getElementById('answer-query'), st = document.getElementById('ask-status');
+  go.disabled = true; ans.textContent = ''; qq.style.display = 'none'; st.textContent = 'Asking Keewano…';
+  const t0 = performance.now();
+  try {
+    const d = await get('/ask', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ question: q }) });
+    ans.textContent = d.answer;
+    qq.textContent = d.query; qq.style.display = 'block';
+    st.textContent = `${((performance.now() - t0) / 1000).toFixed(1)} s · ${d.rows != null ? d.rows + ' rows' : ''}`;
+  } catch (e) { st.innerHTML = `<span class="err">${esc(e.message)}</span>`; }
+  go.disabled = false;
+}
+
+function fmt(v) { if (v == null) return '—'; if (Math.abs(v) >= 1000) return Math.round(v).toLocaleString(); return (Math.round(v * 1000) / 1000).toString(); }
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+loadReport(); loadDecisions();
+</script>
+</body>
+</html>
