@@ -8,3 +8,5 @@ outputs/runs/*.csv
 out/
 web/vendor/src/node_modules/
 web/vendor/src/package-lock.json
+sites/*/raw/
+.gstack/

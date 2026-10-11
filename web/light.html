@@ -1073,7 +1073,10 @@ function watchBuild(id) {
         : '<span>You can keep browsing; this card updates every 2 seconds.</span>'}</div>`;
     if (m.status === 'error') {
       lsSet(BUILD_KEY, null); watching = null;
-      document.getElementById('plan-again').onclick = () => { prog.hidden = true; body.hidden = false; loadSites(); };
+      document.getElementById('plan-again').onclick = async () => {   // resume the same site (downloads are cached)
+        try { await get(`/sites/${encodeURIComponent(id)}/retry`, { method:'POST' }); lsSet(BUILD_KEY, id); watchBuild(id); }
+        catch (e) { prog.hidden = true; body.hidden = false; loadSites(); }
+      };
       return;
     }
     if (m.status === 'ready') { lsSet(BUILD_KEY, null); setTimeout(() => goSite(id), 900); return; }

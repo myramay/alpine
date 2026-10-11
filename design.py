@@ -427,7 +427,7 @@ def _network_result(c: pd.DataFrame, terms: dict, edges: list[dict], seed, pipe_
 
 # ------------------------------------------------------------------------------- other paths
 
-def trucked(b: pd.DataFrame, connected_ids: set) -> dict:
+def trucked(b: pd.DataFrame, connected_ids: set, cap_mwh: float | None = None) -> dict:
     """Large users off the network, served by mobile thermal storage."""
     site, d = _cfgs()
     t, f = d["methods"]["trucked"], d["finance"]
@@ -439,9 +439,16 @@ def trucked(b: pd.DataFrame, connected_ids: set) -> dict:
     big["cost_usd_mwh"] = t["usd_per_mwh_fixed"] + t["usd_per_mwh_km"] * road_km
     big["margin_usd_mwh"] = big["value_usd_mwh"] - big["cost_usd_mwh"]
     big["npv_usd"] = big["margin_usd_mwh"] * big["mwh"] * pvf
-    win = big[big["npv_usd"] > 0]
+    win = big[(big["npv_usd"] > 0) & (big["road_km"] <= t.get("max_road_km", np.inf))]
+    # logistics: a fleet of max_trips_per_day containers of mwh_per_trip each, best margin first
+    fleet_mwh = t.get("max_trips_per_day", np.inf) * 365 * t.get("mwh_per_trip", 1.0)
+    limit = min(fleet_mwh, max(cap_mwh, 0.0)) if cap_mwh is not None else fleet_mwh
+    win = win.sort_values("margin_usd_mwh", ascending=False)
+    win = win[win["mwh"].cumsum() <= limit]
     co2 = float((win["mwh"] * win["co2_t_mwh"]).sum())
+    trips = float(win["mwh"].sum()) / t.get("mwh_per_trip", 1.0)
     return {"candidates": int(len(big)), "served": int(len(win)), "delivered_mwh": round(float(win["mwh"].sum())),
+            "trips_per_day": round(trips / 365, 1), "fleet_limit_mwh": round(float(fleet_mwh)),
             "npv_usd": round(float(win["npv_usd"].sum())), "co2_avoided_t": round(co2),
             "npv_with_carbon_usd": round(float(win["npv_usd"].sum()) + co2 * f["carbon_price_usd_per_t"] * pvf),
             "users": [{"name": r["name"], "road_km": round(r["road_km"], 1), "mwh": round(r["mwh"]),
@@ -552,7 +559,7 @@ def _recommend() -> dict:
         bx = np.floor((b["lon"] - lon0) * 111.0 * math.cos(math.radians(lat0)) / cell).astype(int)
         by = np.floor((b["lat"] - lat0) * 111.0 / cell).astype(int)
         connected = set(b.index[[(x, y) in cl for x, y in zip(bx, by)]])
-    trk = trucked(b, connected)
+    trk = trucked(b, connected, cap_mwh=float(np.maximum(avail - taken, 0.0).sum()))
 
     pathways = [{
         "key": "network", "label": "District network to existing buildings",
@@ -581,7 +588,9 @@ def _recommend() -> dict:
                   "npv_with_carbon_usd": x["npv_with_carbon_usd"], "co2_avoided_t": x["co2_avoided_t"],
                   "peak_mw": x["peak_mw"]} for x in anc]
     pathways.append({"key": "trucked", "label": d["methods"]["trucked"]["label"],
-                     "detail": f"{trk['served']} of {trk['candidates']} large off-network users pay off",
+                     "detail": f"{trk['served']} of {trk['candidates']} large off-network users, about "
+                               f"{trk['trips_per_day']:g} container trips a day (fleet limit "
+                               f"{d['methods']['trucked'].get('max_trips_per_day', 0)}/day)",
                      "delivered_mwh": trk["delivered_mwh"], "capex_usd": 0, "npv_usd": trk["npv_usd"],
                      "npv_with_carbon_usd": trk["npv_with_carbon_usd"], "co2_avoided_t": trk["co2_avoided_t"],
                      "peak_mw": None})
@@ -593,7 +602,7 @@ def _recommend() -> dict:
 
     pit = pit_location(net)
     avail_mwh = float(avail.sum())
-    reused_mwh = float(reused.sum())
+    reused_mwh = float(reused.sum()) + trk["delivered_mwh"]   # trucked heat is capped at what is left
     rec = [p for p in pathways if p["verdict"] == "recommend"]
     lines = [f"Reuse {reused_mwh / avail_mwh:.0%} of the site's {avail_mwh / 1000:,.0f} GWh/yr of captured heat "
              f"({reused_mwh / 1000:,.0f} GWh/yr), for a combined 20-year NPV of "

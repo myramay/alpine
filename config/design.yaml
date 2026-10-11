@@ -52,6 +52,9 @@ methods:
     usd_per_mwh_fixed: 28.0         # charge/discharge stations and container rental per MWh; assumption - verify (literature EUR 20-60/MWh)
     usd_per_mwh_km: 1.1             # haulage per MWh per road km; assumption - verify
     min_mwh_per_year: 400.0         # only worth a truck schedule for large users
+    mwh_per_trip: 2.5               # heat delivered per PCM container trip (~2-3 MWh containers); assumption - verify
+    max_trips_per_day: 24           # fleet the site would realistically run (~1 truck an hour); assumption - verify
+    max_road_km: 30.0               # beyond this a container round trip stops making sense; assumption - verify
 
 heat_pump:
   carnot_fraction: 0.6              # challenge spec

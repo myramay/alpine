@@ -46,6 +46,7 @@ Keewano stores one typed value per event with no float type (uint, string, bool,
 | `storage_soc` (0-1) | `storage_soc_pct` (0-100) |
 | `decision` | `decision` |
 | tags `hour`, `day`, `month`, `scenario`, `run_id` | context events emitted before each hour's measures (step functions) |
+| the site (`sites.py` id; `lansing` for the example) | `site` (2036, string), once after `run_id` and `scenario`; the entity is `uuid5("<site>:<run_id>")` |
 | the policy | `policy_prefer_dry`, `policy_storage_reserve_pct`, `policy_tower_cap_mw` every hour; `policy_change` at hour 0 of a changed day |
 
 Also: `demand_kw`, `unmet_demand_kw`, `heat_delivered_kw`, `cooling_kwh`, `heat_pump_kwh`, `pump_kwh`, `ambient_k`. Report queries in Keewano: PUE `sum(power_kwh)/sum(it_kwh)`, WUE `3.785*sum(water_gal)/sum(it_kwh)`, ERF `sum(heat_exported_kw)/sum(power_kwh)`.

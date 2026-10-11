@@ -57,6 +57,7 @@ def built(tmp_path_factory):
     mp.setattr(sites, "SITES_DIR", tmp / "sites")
     mp.setattr(sites, "GEO_DIR", tmp / "geo")
     mp.setattr(sites, "overpass", fake_overpass)
+    mp.setattr(sites, "overpass_buildings", lambda lat, lon, r, raw=None, n=3: fake_overpass("out tags bb;"))
     mp.setattr(sites, "fetch_weather", fake_weather)
     mp.setattr(sites, "geocode", lambda q, raw=None: {"lat": LAT0, "lon": LON0, "display_name": "Testville"})
     mp.setattr(sites, "_sleep", lambda s: None)

@@ -1,0 +1,100 @@
+{
+ "id": "ashburn_va",
+ "name": "Ashburn, VA",
+ "address": "Ashburn, VA",
+ "lat": 39.029784,
+ "lon": -77.4744148,
+ "it_mw": 100.0,
+ "radius_km": 5.0,
+ "created": "2026-10-11T23:28:03+00:00",
+ "status": "ready",
+ "step": "ready",
+ "progress": 1.0,
+ "steps": [
+  "geocoding",
+  "weather",
+  "buildings",
+  "demand",
+  "simulating",
+  "streaming to Keewano",
+  "designing",
+  "ready"
+ ],
+ "sources": {
+  "geocode": "entered lat/lon",
+  "weather": "Open-Meteo archive, 2023 hourly temperature_2m (UTC)",
+  "buildings": "OpenStreetMap via Overpass: 15,077 heated buildings within 5 km, 1,367 footprints within 1.2 km for the map, 10 water areas",
+  "supply": "Lansing supply model (data/supply.csv) scaled to 100 MW IT",
+  "demand": "ESTIMATED (see notes)"
+ },
+ "notes": [
+  "Heat demand is ESTIMATED, not metered: OSM footprint x levels (defaults by type when untagged) x heat intensity by building type (residential 110, office 90, school 100, retail 120, restaurant 150, clinic 150, hospital 180, industrial/warehouse 60 kWh/m2.yr at 3,500 HDD (18 C base); assumption - verify), space heat scaled by this location's 2,043 HDD vs 3,500; hourly shape max(0, 16 C - T) + 15% flat hot water; P10/P90 = P50 -/+ 35%.",
+  "What buildings pay for heat today is unknown here: design.py uses its default fuel cost.",
+  "Prices, grid carbon and cooling constants are the Lansing (upstate NY) defaults; verify locally.",
+  "Data-center buildings, garages/sheds and anonymous boxes over 10,000 m2 (likely data halls or warehouses) are excluded from demand."
+ ],
+ "updated": "2026-10-11T23:49:35+00:00",
+ "started": "2026-10-11T23:42:51+00:00",
+ "display_name": "Ashburn, Loudoun County, Virginia, United States",
+ "failed_step": null,
+ "error": null,
+ "finished": "2026-10-11T23:48:30+00:00",
+ "facts": {
+  "hdd_18c": 2043,
+  "hdd_factor": 0.584,
+  "peak_factor": 4.713,
+  "buildings": 15077,
+  "rows": 2949,
+  "annual_gwh": 761.88,
+  "weighted_dist_km": 3.25,
+  "by_type": {
+   "apartments": 489,
+   "civic": 55,
+   "clinic": 1,
+   "college": 8,
+   "food": 43,
+   "hospital": 2,
+   "hotel": 13,
+   "house": 11676,
+   "industrial": 158,
+   "office": 313,
+   "retail": 142,
+   "school": 38,
+   "terrace": 2139
+  }
+ },
+ "run_id": "normal-10112346-181b",
+ "sim": {
+  "run_id": "normal-10112346-181b",
+  "summary": {
+   "pue": 1.1387409538462552,
+   "wue_l_per_kwh": 0.4367819655900572,
+   "erf": 0.3637023921233421,
+   "share_reused": 0.5707996900017611,
+   "heat_available_gwh": 635.6235279999979
+  }
+ },
+ "keewano": {
+  "sent": 254420,
+  "accepted": 254420,
+  "batches": 255,
+  "seconds": 125.362,
+  "entity": "51267cc5-06a2-5291-b739-2dd58e90dafb",
+  "dry_run": false,
+  "events": 254420
+ },
+ "headline": {
+  "heat_available_gwh": 635.6,
+  "share_reused": 0.775,
+  "npv_recommended_usd": 161580881,
+  "co2_avoided_t": 117302,
+  "best_pathway": "Trucked thermal storage (PCM containers)",
+  "first_lines": [
+   "Reuse 77% of the site's 636 GWh/yr of captured heat (493 GWh/yr), for a combined 20-year NPV of $161.6M and 117,302 t CO2/yr avoided:",
+   "1. Trucked thermal storage (PCM containers): 483 of 483 large off-network users pay off. 324.9 GWh/yr, NPV $128.8M.",
+   "2. Greenhouse (year-round produce): 22.0 MW peak (40.0 acres), takes 40 C heat directly at the site. 53.8 GWh/yr, NPV $13.3M."
+  ]
+ },
+ "ready_note": "ready (Keewano data queryable in ~5 min)",
+ "seconds": 339.7
+}

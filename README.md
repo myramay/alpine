@@ -85,6 +85,14 @@ python design.py                 # plain-English recommendation + summary
 
 Also reported: the best network found even when it loses money, whether it pays at a $190/t carbon price, and the pipe cost at which it would break even. Every cost is in `config/design.yaml` with its source, and most are marked "assumption - verify".
 
+## Any location: `sites.py`
+
+Enter an address (or "lat, lon") and the IT MW on the page, or `POST /sites {address | lat+lon, it_mw}`; poll `GET /sites/{id}` (`GET /sites` lists them, Lansing first; `POST /sites/{id}/retry` resumes a failed build). CLI: `python sites.py "Ashburn, VA" --it-mw 100`.
+
+The build (about 3-6 minutes, most of it the Keewano stream) writes `sites/<id>/` (site.yaml, supply.csv, demand.csv, customers.csv, meta.json, raw/ cache) and `web/geo/<id>.json`, then runs the normal year with `push=True`, the other scenarios locally, and `design.recommend(site=id)`. Every site-specific endpoint takes `?site=<id>` (`/runs`, `/run`, `/design`, `/design/geojson`, `/compare`, `/sensitivity`; `/ask` takes `site` in the body). Without it, everything is Lansing as before.
+
+What is real and what is estimated: location (Nominatim), hourly 2023 temperature (Open-Meteo archive), building footprints, types, levels and water (OpenStreetMap via Overpass) are real data. Supply is Lansing's supply model scaled by IT MW / 100. Heat demand is **estimated**: footprint x levels x a heat intensity per building type, space heat scaled by the location's heating degree-days, hourly shape max(0, 16 C - T) plus 15% hot water. Prices, grid carbon and cooling constants are the Lansing defaults. `meta.json` and `site.yaml` say so line by line.
+
 ## Frontend
 
 `/` serves `web/light.html`, the production page. It has seven tabs:

@@ -422,11 +422,8 @@ def _headline(meta: dict) -> dict | None:
         rec = _design("lansing")["rec"]
     except Exception:  # noqa: BLE001
         return None
-    s = rec["summary"]
-    best = next((x for x in rec["pathways"] if x["verdict"] == "recommend"), None)
-    return {"heat_available_gwh": s["heat_available_gwh"], "share_reused": s["share_reused"],
-            "npv_recommended_usd": s["npv_recommended_usd"], "co2_avoided_t": s["co2_avoided_t"],
-            "best_pathway": best["label"] if best else None, "first_lines": rec["recommendation"][:3]}
+    import sites
+    return sites.headline_of(rec)
 
 
 def _site_view(meta: dict, full: bool = False) -> dict:

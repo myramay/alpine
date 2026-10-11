@@ -221,13 +221,38 @@ def overpass(query: str, raw: Path | None = None, name: str = "overpass.json", t
                         r = c.post(url, data={"data": query})
                     if r.status_code == 200 and r.headers.get("content-type", "").startswith("application/json"):
                         return r.json()
-                    last = f"{url}: HTTP {r.status_code} {r.text[:160]!r}"
+                    last = f"{url.split('/')[2]}: HTTP {r.status_code}"
                 except Exception as e:  # noqa: BLE001
-                    last = f"{url}: {type(e).__name__}"
+                    last = f"{url.split('/')[2]}: {type(e).__name__}"
                 _sleep(2.0)
             _sleep(10.0 * (rnd + 1))
         raise RuntimeError(f"OpenStreetMap Overpass is unavailable right now ({last}); try again in a few minutes")
     return _cached(raw, name, fetch)
+
+
+def overpass_buildings(lat: float, lon: float, radius_m: float, raw: Path | None = None, n: int = 3) -> dict:
+    """Building ways within radius_m (`out tags geom`: bounds + exact footprint), fetched as an n x n grid of bboxes: small queries get
+    through a loaded Overpass where one big one times out. Each cell is cached, so a retry resumes."""
+    dlat, dlon = radius_m / 110540.0, radius_m / (111320.0 * math.cos(math.radians(lat)))
+    seen, els = set(), []
+    for i in range(n):
+        for j in range(n):
+            s_, w_ = lat - dlat + 2 * dlat * i / n, lon - dlon + 2 * dlon * j / n
+            n_, e_ = s_ + 2 * dlat / n, w_ + 2 * dlon / n
+            q = f'[out:json][timeout:90];way["building"]({s_:.6f},{w_:.6f},{n_:.6f},{e_:.6f});out tags geom;'
+            data = overpass(q, raw, f"overpass_bldg_geom_{i}{j}.json", tries=3)
+            for el in data.get("elements", []):
+                if el.get("id") in seen:
+                    continue
+                seen.add(el.get("id"))
+                bb = el.get("bounds")
+                if bb:
+                    clat, clon = (bb["minlat"] + bb["maxlat"]) / 2, (bb["minlon"] + bb["maxlon"]) / 2
+                    if math.hypot((clat - lat) * 110540.0, (clon - lon) * 111320.0 * math.cos(math.radians(lat))) > radius_m:
+                        continue
+                els.append(el)
+            _sleep(1.0)
+    return {"elements": els}
 
 
 # ---------------------------------------------------------------------------- building model
@@ -295,6 +320,11 @@ def classify(tags: dict, area_m2: float) -> str | None:
         return "terrace"
     if b in HOUSE:
         return "apartments" if b == "residential" and area_m2 > 600 else "house"
+    # very large anonymous boxes (no name, shop, amenity or office tag): in data-center markets these are
+    # mostly data halls or big warehouses, neither heated like a building; leave them out
+    if (b in ("yes", "commercial", "industrial", "warehouse") and area_m2 > 10000 and not name
+            and not (am or shop or tags.get("office"))):
+        return None
     # building=yes or unknown: decide by size
     if area_m2 < 40:
         return None
@@ -418,8 +448,13 @@ def parse_candidates(data: dict, proj: Proj, tile_info: dict[int, dict] | None =
         lat = (bb["minlat"] + bb["maxlat"]) / 2
         lon = (bb["minlon"] + bb["maxlon"]) / 2
         ti = tile_info.get(el.get("id"))
-        area = ti["area"] if ti else ((bb["maxlat"] - bb["minlat"]) * proj.ky
-                                      * (bb["maxlon"] - bb["minlon"]) * proj.kx * 0.75)
+        if ti:
+            area = ti["area"]
+        elif el.get("geometry"):
+            gx, gy = proj.xy([p["lat"] for p in el["geometry"]], [p["lon"] for p in el["geometry"]])
+            area = _poly_area(list(zip(gx, gy)))
+        else:   # bounding box only: a rotated footprint fills ~60% of it
+            area = (bb["maxlat"] - bb["minlat"]) * proj.ky * (bb["maxlon"] - bb["minlon"]) * proj.kx * 0.6
         t = classify(tags, area)
         if t is None or area < 20:
             continue
@@ -623,9 +658,7 @@ def build(site_id: str, push: bool = True, tile_km: float = 1.2) -> str:
         tile = overpass(q_tile, raw, "overpass_tile.json")
         buildings, water, info = parse_tile(tile, proj)
         _sleep(1.0)
-        q_cand = (f'[out:json][timeout:180];way["building"](around:{radius_km * 1000:.0f},{lat},{lon});'
-                  f'out tags bb;')
-        cand_raw = overpass(q_cand, raw, "overpass_buildings.json")
+        cand_raw = overpass_buildings(lat, lon, radius_km * 1000, raw)
         cands = parse_candidates(cand_raw, proj, info)
 
         step = "demand"
@@ -652,7 +685,8 @@ def build(site_id: str, push: bool = True, tile_km: float = 1.2) -> str:
                    "P10/P90 = P50 -/+ 35%.",
                    "What buildings pay for heat today is unknown here: design.py uses its default fuel cost.",
                    "Prices, grid carbon and cooling constants are the Lansing (upstate NY) defaults; verify locally.",
-                   "Data-center buildings and garages/sheds are excluded from demand."])
+                   "Data-center buildings, garages/sheds and anonymous boxes over 10,000 m2 (likely data halls or "
+                   "warehouses) are excluded from demand."])
 
         step = "simulating"
         set_status(site_id, step)
@@ -681,12 +715,8 @@ def build(site_id: str, push: bool = True, tile_km: float = 1.2) -> str:
         step = "designing"
         set_status(site_id, step)
         import design
-        rec = design.recommend(site=site_id)
-        s = rec["summary"]
-        best = next((x for x in rec["pathways"] if x["verdict"] == "recommend"), None)
-        headline = {"heat_available_gwh": s["heat_available_gwh"], "share_reused": s["share_reused"],
-                    "npv_recommended_usd": s["npv_recommended_usd"], "co2_avoided_t": s["co2_avoided_t"],
-                    "best_pathway": best["label"] if best else None, "first_lines": rec["recommendation"][:3]}
+        design._cfgs_for.cache_clear()       # a rebuilt site must not reuse a cached config
+        headline = headline_of(design.recommend(site=site_id))
         ready_note = ("ready (Keewano data queryable in ~5 min)" if kw.get("accepted") else "ready")
         set_status(site_id, "ready", headline=headline, ready_note=ready_note,
                    seconds=round(time.monotonic() - t0, 1), finished=_now())
@@ -695,6 +725,15 @@ def build(site_id: str, push: bool = True, tile_km: float = 1.2) -> str:
         traceback.print_exc()
         set_status(site_id, "error", failed_step=step, error=_safe(e), finished=_now())
         raise
+
+
+def headline_of(rec: dict) -> dict:
+    """The few numbers a site chip / compare row needs, from design.recommend()."""
+    s = rec["summary"]
+    best = next((x for x in rec["pathways"] if x["verdict"] == "recommend"), None)
+    return {"heat_available_gwh": s["heat_available_gwh"], "share_reused": s["share_reused"],
+            "npv_recommended_usd": s["npv_recommended_usd"], "co2_avoided_t": s["co2_avoided_t"],
+            "best_pathway": best["label"] if best else None, "first_lines": rec["recommendation"][:3]}
 
 
 def _safe(e: Exception) -> str:
@@ -721,6 +760,24 @@ def start_site(name: str | None = None, address: str | None = None, lat: float |
             pass
     threading.Thread(target=job, name=f"site-{sid}", daemon=True).start()
     return sid
+
+
+def retry_site(site_id: str, push: bool = True) -> str:
+    """Rebuild a site whose build failed; cached raw responses are reused, so it resumes."""
+    meta = read_meta(site_id)
+    if not meta or site_id == DEFAULT_SITE:
+        raise ValueError(f"no site {site_id!r}")
+    if meta.get("status") != "error":
+        raise ValueError(f"site {site_id!r} is {meta.get('status')}, not failed")
+    _write_meta(site_id, status="queued", step="queued", progress=0.0, error=None, failed_step=None)
+
+    def job():
+        try:
+            build(site_id, push=push)
+        except Exception:  # noqa: BLE001 - recorded in meta.json
+            pass
+    threading.Thread(target=job, name=f"site-{site_id}", daemon=True).start()
+    return site_id
 
 
 if __name__ == "__main__":

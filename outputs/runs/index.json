@@ -223,5 +223,92 @@
    "hours_pit_empty": 0,
    "hours_unmet_demand": 0
   }
+ },
+ {
+  "run_id": "normal-10112337-2099",
+  "scenario": "normal",
+  "sim": "alpine",
+  "site": "ashburn_va_2",
+  "policy": {
+   "prefer_dry": false,
+   "storage_reserve": 0.2,
+   "tower_cap_mw": 1000000000.0
+  },
+  "created": "2026-10-11T23:37:36+00:00",
+  "totals": {
+   "pue": 1.1448728103444776,
+   "wue_l_per_kwh": 0.4363018767153744,
+   "erf": 0.3953062738012357,
+   "heat_available_gwh": 635.6235279999979,
+   "heat_exported_gwh": 396.46380436028375,
+   "heat_delivered_gwh": 458.6000835297634,
+   "heat_stored_gwh": 14.855167484812304,
+   "heat_rejected_gwh": 224.30455615486576,
+   "share_reused": 0.6237399764098805,
+   "water_mgal": 100.9796341442549,
+   "cost_musd": 83.21001405780676,
+   "co2_kt": 22.69654108331894,
+   "hours_tower": 8760,
+   "hours_pit_empty": 0,
+   "hours_unmet_demand": 3977
+  }
+ },
+ {
+  "run_id": "normal-10112338-e5b8",
+  "scenario": "normal",
+  "sim": "alpine",
+  "site": "ashburn_va",
+  "policy": {
+   "prefer_dry": false,
+   "storage_reserve": 0.2,
+   "tower_cap_mw": 1000000000.0
+  },
+  "created": "2026-10-11T23:38:40+00:00",
+  "totals": {
+   "pue": 1.1448728103444776,
+   "wue_l_per_kwh": 0.4363018767153744,
+   "erf": 0.3953062738012357,
+   "heat_available_gwh": 635.6235279999979,
+   "heat_exported_gwh": 396.46380436028375,
+   "heat_delivered_gwh": 458.6000835297634,
+   "heat_stored_gwh": 14.855167484812304,
+   "heat_rejected_gwh": 224.30455615486576,
+   "share_reused": 0.6237399764098805,
+   "water_mgal": 100.9796341442549,
+   "cost_musd": 83.21001405780676,
+   "co2_kt": 22.69654108331894,
+   "hours_tower": 8760,
+   "hours_pit_empty": 0,
+   "hours_unmet_demand": 3977
+  }
+ },
+ {
+  "run_id": "normal-10112346-181b",
+  "scenario": "normal",
+  "sim": "alpine",
+  "site": "ashburn_va",
+  "policy": {
+   "prefer_dry": false,
+   "storage_reserve": 0.2,
+   "tower_cap_mw": 1000000000.0
+  },
+  "created": "2026-10-11T23:46:21+00:00",
+  "totals": {
+   "pue": 1.1387409538462552,
+   "wue_l_per_kwh": 0.4367819655900572,
+   "erf": 0.3637023921233421,
+   "heat_available_gwh": 635.6235279999979,
+   "heat_exported_gwh": 362.81371274022456,
+   "heat_delivered_gwh": 420.65072285550417,
+   "heat_stored_gwh": 14.269158628878698,
+   "heat_rejected_gwh": 258.54065663089574,
+   "share_reused": 0.5707996900017611,
+   "water_mgal": 101.09074803468134,
+   "cost_musd": 84.89654291144316,
+   "co2_kt": 30.132929236272066,
+   "hours_tower": 8760,
+   "hours_pit_empty": 0,
+   "hours_unmet_demand": 3475
+  }
  }
 ]
