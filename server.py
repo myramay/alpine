@@ -352,8 +352,18 @@ def design_geojson():
     return design.geojson(design_recommend()) if "rec" not in _design_cache else design.geojson(_design_cache["rec"])
 
 
+_SENS_CACHE: dict = {}
+
+
 @app.get("/sensitivity")
 def sensitivity(scenario: str = "normal"):
+    """Cached per scenario: the inputs (config + data) don't change while the server runs, and a cold run is ~6 s."""
+    if scenario not in _SENS_CACHE:
+        _SENS_CACHE[scenario] = _sensitivity(scenario)
+    return _SENS_CACHE[scenario]
+
+
+def _sensitivity(scenario: str = "normal"):
     """One-at-a-time +/-25% on the 'assumption - verify' constants; which ones move WUE and ERF."""
     import copy
     import thermal
