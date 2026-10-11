@@ -11,6 +11,7 @@ import threading
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 
 from dotenv import load_dotenv
 from fastapi import BackgroundTasks, FastAPI, HTTPException
@@ -123,7 +124,7 @@ def index():
 
 class Ask(BaseModel):
     question: str
-    run_id: str | None = None
+    run_id: Optional[str] = None  # Optional, not "str | None": pydantic evaluates it, and Python 3.9 cannot
 
 
 def _latest_run() -> dict | None:
