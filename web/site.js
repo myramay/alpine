@@ -6,12 +6,12 @@ const canvas = document.getElementById('scene');
 if (canvas) init();
 
 function init() {
-  const C = { sell: 0x58c48b, store: 0x6ea8fe, dry: 0x8b93a7, tower: 0xe5655a, water: 0x4cc3e6, dc: 0x2a2f3a, ground: 0x12151c, bld: 0x3a4152, accent: 0xf2a93b };
+  const C = { sell: 0x34d399, store: 0x60a5fa, dry: 0xa1a1aa, tower: 0xf87171, water: 0x22d3ee, dc: 0x27272a, ground: 0x0f0f12, bld: 0x3f3f46, accent: 0xf2a93b };
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0b0d12);
-  scene.fog = new THREE.Fog(0x0b0d12, 60, 140);
+  scene.background = new THREE.Color(0x0a0a0d);
+  scene.fog = new THREE.Fog(0x0a0a0d, 60, 140);
   const camera = new THREE.PerspectiveCamera(40, 2, 0.1, 300);
   scene.add(new THREE.HemisphereLight(0xbfd4ff, 0x1a1d26, 0.9));
   const sun = new THREE.DirectionalLight(0xffffff, 1.1); sun.position.set(30, 50, 20); scene.add(sun);
@@ -99,6 +99,7 @@ function init() {
     if (!rows) return;
     const r = rows[d];
     const sell = r.heat_exported_mw / 24, dry = r.dry_mw / 24, tower = r.heat_tower_mw / 24, avail = r.heat_available_mw / 24, store = r.heat_stored_mw / 24;
+    window.dispatchEvent(new CustomEvent('alpine:day', { detail: { row: r, label: dayLabel.textContent, max: { water: maxWater, heat: maxHeat } } }));
     hud.innerHTML = `<span>heat <b>${avail.toFixed(0)} MW</b></span><span>to network <b>${sell.toFixed(0)} MW</b></span><span>dry <b>${dry.toFixed(0)} MW</b></span><span>towers <b>${tower.toFixed(0)} MW</b></span><span>water <b>${Math.round(r.water_gal).toLocaleString()} gal</b></span><span>pit <b>${Math.round(r.storage_soc * 100)}%</b></span><span>cost <b>$${Math.round(r.cost_usd / 1000)}k</b></span>`;
     scenarioTag.visible = r.scenario !== 'normal';
     if (scenarioTag.visible) { scene.remove(scenarioTag); const s = makeLabel(r.scenario.replace('_', ' ').toUpperCase(), '#f2a93b'); s.position.set(0, 9.5, 0); scenarioTag.geometry = s.geometry; scenarioTag.material = s.material; scene.add(scenarioTag); }
