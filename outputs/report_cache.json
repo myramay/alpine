@@ -1,0 +1,28 @@
+{
+ "normal-69a3c5": {
+  "run_id": "normal-69a3c5",
+  "cached": false,
+  "source": "keewano",
+  "computed_at": "2026-10-11T21:42:15+00:00",
+  "metrics": [
+   {
+    "name": "PUE",
+    "value": 1.2172682950887157,
+    "unit": "facility kWh / IT kWh",
+    "query": "SELECT sum(power_kwh) AS power_kwh, sum(it_kwh) AS it_kwh, 1.0 * sum(power_kwh) / sum(it_kwh) AS pue FROM events WHERE run_id = 'normal-69a3c5'"
+   },
+   {
+    "name": "WUE",
+    "value": 0.25804688827064526,
+    "unit": "L / IT kWh",
+    "query": "SELECT sum(water_gal) AS water_gal, sum(it_kwh) AS it_kwh, 3.785 * sum(water_gal) / sum(it_kwh) AS wue FROM events WHERE run_id = 'normal-69a3c5'"
+   },
+   {
+    "name": "ERF",
+    "value": 0.15581682818401763,
+    "unit": "heat reused / energy in",
+    "query": "SELECT sum(heat_exported_kw) AS heat_exported_kw, sum(power_kwh) AS power_kwh, 1.0 * sum(heat_exported_kw) / sum(power_kwh) AS erf FROM events WHERE run_id = 'normal-69a3c5'"
+   }
+  ]
+ }
+}

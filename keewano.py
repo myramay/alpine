@@ -31,13 +31,15 @@ try:
 except ImportError:  # pragma: no cover
     pass
 
-INGEST_URL = "https://api.keewano.com/event/ingress/v1/json"
+INGEST_URL = (os.environ.get("KEEWANO_INGEST_URL") or "https://api.keewano.com/event/ingress/v1/json").rstrip("/")
+if INGEST_URL.endswith("/in"):  # accept the full /in endpoint too
+    INGEST_URL = INGEST_URL[:-3]
 DEFAULT_MCP_URL = "https://api.keewano.com/mcp"
 SQL_HOST, SQL_PORT = "pgsql.keewano.com", 27543
 SDK_VERSION = "thermal-layer/0.1"
 MAX_RETRIES = 6
 TIMEOUT = httpx.Timeout(30.0, connect=10.0)
-RUN_ID_RE = re.compile(r"^[a-z][a-z0-9_]*-[0-9a-f]{4,12}$")
+RUN_ID_RE = re.compile(r"^[a-z][a-z0-9_]*(-[0-9a-f]{2,12}){1,2}$")  # normal-7f3a9c, normal-10112130-ab12
 
 _sleep: Callable[[float], None] = time.sleep  # tests patch this to skip backoff
 _registered: str | None = None  # one registration per process
@@ -471,6 +473,68 @@ def _check() -> None:
             print("sql: FAIL", e)
     else:
         print("sql: skipped (need " + ", ".join(v for v in SQL_VARS if not _env(v)) + ")")
+
+
+# --- Alpine scaffold interface (send/query), kept so code written against it still works ---------
+
+_FLOAT_TO_KW = {"heat_available_mw": "heat_available_kw", "heat_exported_mw": "heat_exported_kw",
+                "heat_rejected_mw": "heat_rejected_kw", "heat_tower_mw": "reject_tower_kw"}
+
+
+def send(events: list[dict], run_id: str, batch: int = 500) -> int:
+    """Send scaffold-style float events ({"name", "value", "tags": {hour, day, month, scenario, run_id}}).
+    They are converted to the integer schema (MW -> kW, storage_soc -> pct, signed heat_stored_mw split
+    into stored/discharged, co2_t clamped at 0) and sent with send_events. Returns events accepted.
+    thermal.run(push=True) no longer uses this; it sends its full Keewano rows via send_run."""
+    by_hour: dict[int, dict] = {}
+    for e in events:
+        t = e.get("tags", {})
+        row = by_hour.setdefault(int(t["hour"]), {"hour": int(t["hour"]), "day": int(t["day"]),
+                                                  "month": int(t["month"]), "scenario": t.get("scenario")})
+        row[e["name"]] = e["value"]
+    out: list[schema.Event] = []
+    first = True
+    last_day = last_month = None
+    for h in sorted(by_hour):
+        r, ts = by_hour[h], schema.BASE_TS + h * 3600
+        evs: list[tuple[str, Any]] = []
+        if first:
+            evs += [("run_id", run_id), ("scenario", r.get("scenario") or "normal")]
+            first = False
+        if r["day"] != last_day:
+            evs.append(("day", r["day"])); last_day = r["day"]
+        if r["month"] != last_month:
+            evs.append(("month", r["month"])); last_month = r["month"]
+        evs.append(("hour", h))
+        if "decision" in r:
+            evs.append(("decision", str(r["decision"])))
+        for k, kk in _FLOAT_TO_KW.items():
+            if k in r:
+                evs.append((kk, float(r[k]) * 1000))
+        if "heat_stored_mw" in r:
+            v = float(r["heat_stored_mw"])
+            evs += [("heat_stored_kw", max(v, 0) * 1000), ("heat_discharged_kw", max(-v, 0) * 1000)]
+        for k in ("water_gal", "power_kwh", "it_kwh"):
+            if k in r:
+                evs.append((k, float(r[k])))
+        if "cost_usd" in r:
+            evs.append(("cost_usd", float(r["cost_usd"]) * 100))
+        if "co2_t" in r:
+            evs.append(("co2_kg", float(r["co2_t"]) * 1000))
+        if "storage_soc" in r:
+            evs.append(("storage_soc_pct", float(r["storage_soc"]) * 100))
+        for i, (k, v) in enumerate(evs):
+            dt = schema.EVENT_TYPE[k]
+            val = str(v) if dt == "string" else int(round(float(v))) if dt == "price_usd_cent" else schema.to_int(v)
+            out.append(schema.Event(k, val, ts + i))
+    register_events()
+    return send_events("lansing", run_id, out, batch_size=max(batch, 1))["accepted"]
+
+
+def query(text: str) -> dict:
+    """Plain-English question -> {"answer", "query", "rows"} (Claude + Keewano MCP, via agent.ask)."""
+    import agent
+    return agent.ask(text)
 
 
 def main(argv: list[str]) -> int:

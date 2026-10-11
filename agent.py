@@ -63,6 +63,7 @@ from schema import Policy
 
 ROOT = Path(__file__).resolve().parent
 RUNS_DIR = ROOT / "outputs" / "runs"
+OUT_DIR = ROOT / "out"  # Alpine's local run files (thermal.run) and decisions.json for the web page
 INDEX_PATH = RUNS_DIR / "index.json"
 QUESTIONS_PATH = ROOT / "questions.md"
 
@@ -85,8 +86,21 @@ def _keewano():
 
 
 def _thermal():
-    import thermal
+    import thermal  # Alpine sim (main)
     return thermal
+
+
+def _thermal_basic():
+    import thermal_basic  # first-build sim, kept
+    return thermal_basic
+
+
+def run_sim(run_id: str) -> str:
+    """Which sim produced a run: index.json "sim" field; entries without it came from thermal_basic."""
+    for r in load_index():
+        if r.get("run_id") == run_id:
+            return r.get("sim", "basic")
+    return "alpine"
 
 
 def load_index() -> list[dict]:
@@ -96,8 +110,9 @@ def load_index() -> list[dict]:
         return []
 
 
-def latest_run(scenario: str | None = None) -> str | None:
-    runs = [r for r in load_index() if scenario is None or r.get("scenario") == scenario]
+def latest_run(scenario: str | None = None, sim: str | None = None) -> str | None:
+    runs = [r for r in load_index() if (scenario is None or r.get("scenario") == scenario)
+            and (sim is None or r.get("sim", "basic") == sim)]
     if not runs:
         return None
     runs.sort(key=lambda r: str(r.get("created", "")))
@@ -117,19 +132,19 @@ def _fmt(n: float) -> str:
 DAILY_QUESTIONS = [
     {
         "key": "water_gal",
-        "question": "How many gallons of water did the site use on this day?",
+        "question": "How many gallons of water did the site use yesterday?",
         "query": ("SELECT day, sum(water_gal) AS water_gal FROM events "
                   "WHERE run_id = '{run_id}' AND day IS NOT NULL GROUP BY day ORDER BY day"),
     },
     {
         "key": "unmet_hours",
-        "question": "How many hours had unmet heat demand on this day?",
+        "question": "How many hours yesterday was heat demand higher than heat available?",
         "query": ("SELECT day, count(unmet_demand_kw) FILTER (WHERE unmet_demand_kw > 0) AS unmet_hours "
                   "FROM events WHERE run_id = '{run_id}' AND day IS NOT NULL GROUP BY day ORDER BY day"),
     },
     {
         "key": "empty_hours",
-        "question": "How many hours was the storage pit empty (SOC <= 5%) on this day?",
+        "question": "How many hours yesterday was the pit at or below its minimum level?",
         "query": ("SELECT day, count(storage_soc_pct) FILTER (WHERE storage_soc_pct <= 5) AS empty_hours "
                   "FROM events WHERE run_id = '{run_id}' AND day IS NOT NULL GROUP BY day ORDER BY day"),
     },
@@ -202,7 +217,7 @@ def water_threshold(water_by_day: dict[int, float], pct: float = 75.0) -> float:
     return vals[idx]
 
 
-def decide(prev: Policy, water: float, unmet_h: float, empty_h: float, threshold: float,
+def decide_basic(prev: Policy, water: float, unmet_h: float, empty_h: float, threshold: float,
            calm_streak: int, top_label: str = "top 25%",
            floor_min: float = 0.05) -> tuple[Policy, str, int]:
     """Policy for today from yesterday's three answers. Returns (policy, reason, calm_streak)."""
@@ -247,6 +262,62 @@ def decide(prev: Policy, water: float, unmet_h: float, empty_h: float, threshold
     return p, reason, calm_streak
 
 
+# Alpine rules (thermal.py's policy knobs: prefer_dry, storage_reserve, tower_cap_mw).
+# Thresholds the rules use on the three answers. Tune after the first run.
+WATER_GAL_PER_DAY_HIGH = 200_000
+UNMET_HOURS_HIGH = 4
+PIT_EMPTY_HOURS_HIGH = 6
+
+
+def decide(water_gal: float, unmet_hours: int, pit_empty_hours: int, policy: dict,
+           water_high: float | None = None) -> tuple[dict, str]:
+    """Pure rules on yesterday's answers. Returns (new_policy, reason)."""
+    high = WATER_GAL_PER_DAY_HIGH if water_high is None else water_high
+    p, why = dict(policy), []
+    if water_gal > high:
+        p["prefer_dry"] = True
+        p["tower_cap_mw"] = min(p.get("tower_cap_mw", 1e9), 20.0)
+        why.append(f"water {water_gal:,.0f} gal > {high:,.0f}: cap towers at 20 MW, sell and store first")
+    if unmet_hours > UNMET_HOURS_HIGH:
+        p["storage_reserve"] = min(0.6, p.get("storage_reserve", 0.2) + 0.1)
+        why.append(f"{unmet_hours} h unmet demand: raise storage reserve to {p['storage_reserve']:.1f}")
+    if pit_empty_hours > PIT_EMPTY_HOURS_HIGH:
+        p["storage_reserve"] = min(0.6, p.get("storage_reserve", 0.2) + 0.1)
+        why.append(f"pit empty {pit_empty_hours} h: charge earlier")
+    return p, "; ".join(why) or "no change"
+
+
+def plan_year_alpine(daily: dict, base: dict | None = None, water_high: float | None = None,
+                     days: int = 365) -> dict:
+    """Sabina's decide() on every day of the baseline answers. Returns {days, policy_by_day, notes, decisions}."""
+    ans = daily["answers"]
+    water, unmet, empty = (ans[k]["by_day"] for k in ("water_gal", "unmet_hours", "empty_hours"))
+    policy = dict(base or _thermal().DEFAULT_POLICY)
+    log = [{"day": 0, "date": day_date(0), "questions": [], "policy": dict(policy),
+            "reason": "day 0: default policy (no previous day to look at)", "changed": False}]
+    flat = []      # out/decisions.json shape the web page reads: {day, question, answer, decision, changed}
+    by_day: dict[int, dict] = {}
+    notes: dict[int, str] = {}
+    for d in range(1, days):
+        y = d - 1
+        w, u, e = water.get(y, 0.0), int(unmet.get(y, 0)), int(empty.get(y, 0))
+        new, reason = decide(w, u, e, policy, water_high=water_high)
+        changed = new != policy
+        questions = [{"question": ans[k]["question"], "query": ans[k]["query"], "answer_day": y,
+                      "answer": v, "source": daily["source"]}
+                     for k, v in (("water_gal", w), ("unmet_hours", u), ("empty_hours", e))]
+        log.append({"day": d, "date": day_date(d), "questions": questions, "policy": dict(new),
+                    "reason": reason, "changed": changed})
+        flat.append({"day": d, "question": " / ".join(q["question"] for q in questions),
+                     "answer": f"{w:,.0f} gal, {u} h unmet, {e} h pit empty",
+                     "decision": reason, "changed": changed})
+        if changed:
+            by_day[d] = dict(new)
+            notes[d] = reason[:256]
+        policy = new
+    return {"days": log, "policy_by_day": by_day, "notes": notes, "decisions": flat}
+
+
 def plan_year(daily: dict, water_pct: float = 75.0, water_gal: float | None = None,
               base: Policy | None = None, days: int = 365) -> dict:
     """Apply the rules to every day. Returns {threshold, days:[...], policies, notes}."""
@@ -270,7 +341,7 @@ def plan_year(daily: dict, water_pct: float = 75.0, water_gal: float | None = No
     for d in range(1, days):
         y = d - 1
         w, u, e = water.get(y, 0.0), unmet.get(y, 0.0), empty.get(y, 0.0)
-        new, reason, calm = decide(policy, w, u, e, threshold, calm, top_label, floor_min)
+        new, reason, calm = decide_basic(policy, w, u, e, threshold, calm, top_label, floor_min)
         changed = new != policy
         questions = [
             {"question": ans[k]["question"], "query": ans[k]["query"], "answer_day": y,
@@ -317,8 +388,11 @@ def print_comparison(cmp: dict) -> None:
 
 def run_daily_agent(baseline_run_id: str, offline: bool = False, push: bool = True,
                     water_pct: float = 75.0, water_gal: float | None = None,
-                    resimulate: bool = True, agent_run_id: str | None = None) -> dict:
+                    resimulate: bool = True, agent_run_id: str | None = None, sim: str | None = None) -> dict:
+    """sim="alpine" (thermal.py + Sabina's decide) or "basic" (thermal_basic.py + decide_basic).
+    Default: the baseline run's own sim from index.json, else alpine."""
     agent_run_id = agent_run_id or f"agent-{uuid.uuid4().hex[:4]}"
+    sim = sim or run_sim(baseline_run_id)
     if offline:
         daily = fetch_daily_answers_offline(baseline_run_id)
     else:
@@ -327,6 +401,9 @@ def run_daily_agent(baseline_run_id: str, offline: bool = False, push: bool = Tr
                              "KEEWANO_PROJECT_ID). Re-run with --offline to use the local CSV.")
         daily = fetch_daily_answers_keewano(baseline_run_id)
 
+    if sim == "alpine":
+        return _run_daily_agent_alpine(baseline_run_id, daily, agent_run_id, push, water_pct, water_gal,
+                                       resimulate)
     plan = plan_year(daily, water_pct=water_pct, water_gal=water_gal)
     n_changed = sum(1 for d in plan["days"] if d["changed"])
     doc = {
@@ -350,7 +427,7 @@ def run_daily_agent(baseline_run_id: str, offline: bool = False, push: bool = Tr
     if not resimulate:
         return doc
 
-    th = _thermal()
+    th = _thermal_basic()
     run = th.simulate(scenario="agent", run_id=agent_run_id, policies=plan["policies"],
                       policy_notes=plan["notes"])
     saved = th.save_run(run)
@@ -375,25 +452,91 @@ def run_daily_agent(baseline_run_id: str, offline: bool = False, push: bool = Tr
     return doc
 
 
+def _run_daily_agent_alpine(baseline_run_id: str, daily: dict, agent_run_id: str, push: bool,
+                            water_pct: float, water_gal: float | None, resimulate: bool) -> dict:
+    """Alpine path: Keewano answers about the baseline -> decide() per day -> thermal.run(policy_by_day)."""
+    water_by_day = daily["answers"]["water_gal"]["by_day"]
+    if water_gal is not None:
+        high = float(water_gal)
+    elif water_pct is not None and water_by_day and max(water_by_day.values()) < WATER_GAL_PER_DAY_HIGH:
+        high = water_threshold(water_by_day, water_pct)   # fixed threshold never trips on this year
+    else:
+        high = None                                        # Sabina's WATER_GAL_PER_DAY_HIGH
+    plan = plan_year_alpine(daily, water_high=high)
+    n_changed = sum(1 for d in plan["days"] if d["changed"])
+    doc = {"agent_run_id": agent_run_id, "baseline_run_id": baseline_run_id, "sim": "alpine",
+           "source": daily["source"],
+           "created": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
+           "rules": {"water_gal_per_day_high": high if high is not None else WATER_GAL_PER_DAY_HIGH,
+                     "unmet_hours_high": UNMET_HOURS_HIGH, "pit_empty_hours_high": PIT_EMPTY_HOURS_HIGH},
+           "days_changed": n_changed, "days": plan["days"]}
+    RUNS_DIR.mkdir(parents=True, exist_ok=True)
+    path = RUNS_DIR / f"decisions_{agent_run_id}.json"
+    path.write_text(json.dumps(doc, indent=1, default=str))
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    (OUT_DIR / "decisions.json").write_text(json.dumps(plan["decisions"], indent=1, default=str))
+    print(f"[{daily['source']}] {n_changed} policy changes over 364 days → {path}")
+    if not resimulate:
+        return doc
+    res = _thermal().run(scenario="agent", push=push, policy_by_day=plan["policy_by_day"],
+                         policy_notes=plan["notes"], run_id=agent_run_id, save=True)
+    print(f"agent run saved: outputs/runs/{agent_run_id}.csv" + (f", {res['n_sent']} events sent" if push else
+                                                                 " (--no-push: not sent to Keewano)"))
+    try:
+        base_tot = hourly_totals(load_hourly_csv(baseline_run_id))
+    except FileNotFoundError:
+        base_tot = {}
+    agent_tot = hourly_totals(res["kw_run"].hourly)
+    for t in (base_tot, agent_tot):   # Alpine hourly rows hold cost in cents (Keewano units)
+        if "cost_usd" in t:
+            t["cost_usd"] /= 100.0
+    cmp = compare_totals(base_tot, agent_tot)
+    doc["comparison"], doc["summary"] = cmp, res["summary"]
+    path.write_text(json.dumps(doc, indent=1, default=str))
+    print_comparison(cmp)
+    return doc
+
+
+def daily_loop(run_id: str) -> dict:
+    """Scaffold name for the daily agent (Keewano answers -> policy -> agent run)."""
+    return run_daily_agent(run_id)
+
+
+def report(run_id: str | None = None) -> dict:
+    """The three metrics live from Keewano, in the web page's shape:
+    {run_id, cached: False, computed_at, metrics: [{name, value, unit, query}]}."""
+    run_id = run_id or latest_run("normal")
+    if not run_id:
+        raise RuntimeError("no normal run in outputs/runs/index.json")
+    r = _keewano().run_report(run_id)
+    units = {"pue": ("PUE", "facility kWh / IT kWh"), "wue": ("WUE", "L / IT kWh"),
+             "erf": ("ERF", "heat reused / energy in")}
+    return {"run_id": run_id, "cached": False, "source": "keewano",
+            "computed_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
+            "metrics": [{"name": units[k][0], "value": r[k]["value"], "unit": units[k][1],
+                         "query": r[k]["query"]} for k in ("pue", "wue", "erf")]}
+
+
 # ------------------------------------------------------------------------------- /ask
 
 def _site_facts() -> str:
     try:
         import yaml
         cfg = yaml.safe_load((ROOT / "config" / "site.yaml").read_text())
-        s, c, st, pr = cfg["site"], cfg["cooling"], cfg["storage"], cfg["prices"]
-        sc = cfg.get("scenarios", {})
-        return (f"- Site: {s['name']}, {s['capacity_mw_th']:.0f} MW thermal, liquid cooled, "
-                f"supply {s['supply_temp_c']:.0f} C.\n"
-                f"- Cooling: chiller COP {c['chiller_cop']}, towers use {c['water_gal_per_kwh']} gal "
-                f"per kWh of cooling electricity, dry coolers {c['dry_capacity_mw']:.0f} MW "
-                f"(derate above {c['dry_derate_start_c']:.0f} C).\n"
+        s, dc, c, hn, st, pr = (cfg["site"], cfg["data_center"], cfg["cooling"], cfg["heat_network"],
+                                cfg["storage"], cfg["prices"])
+        return (f"- Site: {s['name']}, {dc['it_load_mw']:.0f} MW IT, liquid cooled (capture "
+                f"{dc['capture_fraction']:.0%}), supply {dc['supply_temp_c']:.0f} C.\n"
+                f"- Cooling: chillers COP {c['chiller_cop']} on towers / {c['chiller_cop_dry']} on dry "
+                f"condensers; dry coolers {c['dry_cooler_capacity_mw']:.0f} MW; towers use "
+                f"{c['water_gal_per_kwh']} gal per kWh of cooling electricity.\n"
+                f"- Heat network: {hn['supply_temp_c']:.0f} C supply, {hn['route_km']} km route at "
+                f"{hn['pipe_loss_per_km']:.0%}/km loss, heat sold at ${hn['heat_price_usd_per_mwh']:.0f}/MWh.\n"
                 f"- Storage pit: {st['capacity_mwh']:.0f} MWh, charge/discharge "
-                f"{st['max_charge_mw']:.0f}/{st['max_discharge_mw']:.0f} MW, min SOC "
-                f"{st['min_soc'] * 100:.0f}%.\n"
-                f"- Prices: electricity ${pr['electricity_usd_per_mwh']:.0f}/MWh, heat sold at "
-                f"${pr['heat_sale_usd_per_mwh']:.0f}/MWh.\n"
-                f"- Scenario windows: {json.dumps(sc)}")
+                f"{st['max_charge_mw']:.0f}/{st['max_discharge_mw']:.0f} MW, min SOC {st['min_soc'] * 100:.0f}%.\n"
+                f"- Prices: electricity ${pr['electricity_usd_per_mwh']:.0f}/MWh, water "
+                f"${pr['water_usd_per_kgal']}/kgal.\n"
+                f"- Scenario windows (hour of year): {json.dumps(cfg.get('scenarios', {}))}")
     except Exception:  # noqa: BLE001 - facts are a nice-to-have
         return "- Site: 100 MW liquid-cooled data center, Lansing NY."
 
@@ -432,8 +575,12 @@ hour = day*24 + hour_of_day; day 0 = 2025-01-01.
 count(col) counts hours (occurrences). To count hours matching a condition use \
 `count(col) FILTER (WHERE col > 0)`.
 - policy_change events (strings) appear in the agent run at hour 0 of a day when the agent changed \
-policy; the text is the agent's reason. policy_dry_boost_pct and policy_discharge_floor_pct are \
-emitted every hour.
+policy; the text is the agent's reason. Runs from the main (Alpine) sim emit policy_prefer_dry, \
+policy_storage_reserve_pct and policy_tower_cap_mw every hour; runs from the basic sim emit \
+policy_dry_boost_pct and policy_discharge_floor_pct instead.
+- In Alpine runs cost_usd is NET cost (electricity + water - heat sales; electricity_cost_usd, \
+water_cost_usd and heat_revenue_usd are the parts), reject_dry_kw/reject_tower_kw include the chiller \
+condenser heat, and net CO2 = co2_kg - co2_avoided_kg.
 
 ## Units and conversions
 - *_kw columns are average kW over one hour, so sum(x_kw) = kWh. 1 MWh = 1000 kWh.
@@ -675,19 +822,21 @@ def main(argv: list[str] | None = None) -> int:
                     help="percentile of baseline daily water that counts as high (default 75)")
     ap.add_argument("--water-gal", type=float, default=None, help="absolute daily water threshold")
     ap.add_argument("--ask", help="answer one question via /ask instead of running the daily agent")
+    ap.add_argument("--sim", choices=["alpine", "basic"], default=None,
+                    help="which sim re-runs the year (default: the baseline run's own sim)")
     args = ap.parse_args(argv)
 
     if args.ask:
         print(json.dumps(ask(args.ask, run_id=args.run), indent=1, default=str))
         return 0
 
-    run_id = args.run or latest_run("normal")
+    run_id = args.run or latest_run("normal", sim=args.sim or "alpine") or latest_run("normal")
     if not run_id:
         print("no baseline run given and none in outputs/runs/index.json", file=sys.stderr)
         return 2
     run_daily_agent(run_id, offline=args.offline, push=not args.no_push,
                     water_pct=args.water_pct, water_gal=args.water_gal,
-                    resimulate=not args.no_sim)
+                    resimulate=not args.no_sim, sim=args.sim)
     return 0
 
 

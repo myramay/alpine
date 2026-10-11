@@ -1,0 +1,227 @@
+[
+ {
+  "run_id": "normal-69a3c5",
+  "scenario": "normal",
+  "created": "2026-10-11T21:15:44+00:00",
+  "totals": {
+   "pue": 1.2173,
+   "wue_l_per_kwh": 0.2581,
+   "erf": 0.148,
+   "water_gal": 59723498,
+   "unmet_mwh": 0.0,
+   "heat_sold_mwh": 157847.2,
+   "cost_usd": 117298266,
+   "heat_revenue_usd": 6313887,
+   "co2_t": 127961.7,
+   "co2_avoided_t": 33612.2
+  }
+ },
+ {
+  "run_id": "heat_wave-9e3745",
+  "scenario": "heat_wave",
+  "created": "2026-10-11T21:17:09+00:00",
+  "totals": {
+   "pue": 1.2173,
+   "wue_l_per_kwh": 0.2601,
+   "erf": 0.1479,
+   "water_gal": 60184979,
+   "unmet_mwh": 0.0,
+   "heat_sold_mwh": 157739.8,
+   "cost_usd": 117299044,
+   "heat_revenue_usd": 6309592,
+   "co2_t": 127962.6,
+   "co2_avoided_t": 33589.3
+  }
+ },
+ {
+  "run_id": "cold_snap-a079a4",
+  "scenario": "cold_snap",
+  "created": "2026-10-11T21:18:38+00:00",
+  "totals": {
+   "pue": 1.2172,
+   "wue_l_per_kwh": 0.2581,
+   "erf": 0.1492,
+   "water_gal": 59723498,
+   "unmet_mwh": 156.9,
+   "heat_sold_mwh": 159130.4,
+   "cost_usd": 117288996,
+   "heat_revenue_usd": 6365218,
+   "co2_t": 127951.6,
+   "co2_avoided_t": 33885.4
+  }
+ },
+ {
+  "run_id": "server_outage-c3d5bb",
+  "scenario": "server_outage",
+  "created": "2026-10-11T21:20:40+00:00",
+  "totals": {
+   "pue": 1.2173,
+   "wue_l_per_kwh": 0.2582,
+   "erf": 0.148,
+   "water_gal": 59720750,
+   "unmet_mwh": 100.3,
+   "heat_sold_mwh": 157746.9,
+   "cost_usd": 117225203,
+   "heat_revenue_usd": 6309876,
+   "co2_t": 127882.0,
+   "co2_avoided_t": 33590.8
+  }
+ },
+ {
+  "run_id": "agent-c519",
+  "scenario": "agent",
+  "created": "2026-10-11T21:23:11+00:00",
+  "totals": {
+   "pue": 1.2215,
+   "wue_l_per_kwh": 0.2051,
+   "erf": 0.1475,
+   "water_gal": 47471196,
+   "unmet_mwh": 0.0,
+   "heat_sold_mwh": 157847.2,
+   "cost_usd": 117702592,
+   "heat_revenue_usd": 6313887,
+   "co2_t": 128402.8,
+   "co2_avoided_t": 33612.2
+  }
+ },
+ {
+  "run_id": "normal-10112141-9ee4",
+  "scenario": "normal",
+  "sim": "alpine",
+  "policy": {
+   "prefer_dry": false,
+   "storage_reserve": 0.2,
+   "tower_cap_mw": 1000000000.0
+  },
+  "created": "2026-10-11T21:41:57+00:00",
+  "totals": {
+   "pue": 1.097136563847558,
+   "wue_l_per_kwh": 0.4398627079532251,
+   "erf": 0.14962136604023313,
+   "heat_available_gwh": 635.6235279999979,
+   "heat_exported_gwh": 143.8026535514727,
+   "heat_delivered_gwh": 157.84717500000065,
+   "heat_stored_gwh": 3.842222747405677,
+   "heat_rejected_gwh": 487.9786517011196,
+   "share_reused": 0.2262387202751141,
+   "water_mgal": 101.80376865945473,
+   "cost_musd": 96.65853047730542,
+   "co2_kt": 81.72108692857826,
+   "hours_tower": 8760,
+   "hours_pit_empty": 0,
+   "hours_unmet_demand": 0
+  }
+ },
+ {
+  "run_id": "heat_wave-10112144-156c",
+  "scenario": "heat_wave",
+  "sim": "alpine",
+  "policy": {
+   "prefer_dry": false,
+   "storage_reserve": 0.2,
+   "tower_cap_mw": 1000000000.0
+  },
+  "created": "2026-10-11T21:44:59+00:00",
+  "totals": {
+   "pue": 1.0971177418940083,
+   "wue_l_per_kwh": 0.4398713607177013,
+   "erf": 0.1495197477808782,
+   "heat_available_gwh": 635.6235279999979,
+   "heat_exported_gwh": 143.702521849345,
+   "heat_delivered_gwh": 157.73736390000062,
+   "heat_stored_gwh": 3.842222747405677,
+   "heat_rejected_gwh": 488.07878340324726,
+   "share_reused": 0.22608118724224674,
+   "water_mgal": 101.80577129349727,
+   "cost_musd": 96.6633134349437,
+   "co2_kt": 81.74249163096772,
+   "hours_tower": 8760,
+   "hours_pit_empty": 0,
+   "hours_unmet_demand": 0
+  }
+ },
+ {
+  "run_id": "cold_snap-10112146-1de1",
+  "scenario": "cold_snap",
+  "sim": "alpine",
+  "policy": {
+   "prefer_dry": false,
+   "storage_reserve": 0.2,
+   "tower_cap_mw": 1000000000.0
+  },
+  "created": "2026-10-11T21:46:47+00:00",
+  "totals": {
+   "pue": 1.0973450492897525,
+   "wue_l_per_kwh": 0.4398627079532251,
+   "erf": 0.15079756666449456,
+   "heat_available_gwh": 635.6235279999979,
+   "heat_exported_gwh": 144.96065341193892,
+   "heat_delivered_gwh": 159.13240700000077,
+   "heat_stored_gwh": 3.8548030167932947,
+   "heat_rejected_gwh": 486.8080715712659,
+   "share_reused": 0.22806055318320342,
+   "water_mgal": 101.80376865945473,
+   "cost_musd": 96.60150660722681,
+   "co2_kt": 81.46932453255664,
+   "hours_tower": 8760,
+   "hours_pit_empty": 0,
+   "hours_unmet_demand": 0
+  }
+ },
+ {
+  "run_id": "server_outage-10112148-87f2",
+  "scenario": "server_outage",
+  "sim": "alpine",
+  "policy": {
+   "prefer_dry": false,
+   "storage_reserve": 0.2,
+   "tower_cap_mw": 1000000000.0
+  },
+  "created": "2026-10-11T21:48:34+00:00",
+  "totals": {
+   "pue": 1.0971121546334468,
+   "wue_l_per_kwh": 0.4398618268862109,
+   "erf": 0.1494761760781277,
+   "heat_available_gwh": 635.189101999998,
+   "heat_exported_gwh": 143.65991373384352,
+   "heat_delivered_gwh": 157.75643700000063,
+   "heat_stored_gwh": 3.9021845860513413,
+   "heat_rejected_gwh": 487.6270036801032,
+   "share_reused": 0.22616873192802978,
+   "water_mgal": 101.80356474141198,
+   "cost_musd": 96.66162182378329,
+   "co2_kt": 81.73784283830346,
+   "hours_tower": 8760,
+   "hours_pit_empty": 0,
+   "hours_unmet_demand": 6
+  }
+ },
+ {
+  "run_id": "agent-d2a4",
+  "scenario": "agent",
+  "sim": "alpine",
+  "policy": {
+   "prefer_dry": true,
+   "storage_reserve": 0.2,
+   "tower_cap_mw": 20.0
+  },
+  "created": "2026-10-11T21:50:51+00:00",
+  "totals": {
+   "pue": 1.1170726437207645,
+   "wue_l_per_kwh": 0.006657429309916089,
+   "erf": 0.1469511157920658,
+   "heat_available_gwh": 635.6235279999979,
+   "heat_exported_gwh": 143.8026535514727,
+   "heat_delivered_gwh": 157.84717500000065,
+   "heat_stored_gwh": 3.842222747405677,
+   "heat_rejected_gwh": 487.9786517011196,
+   "share_reused": 0.2262387202751141,
+   "water_mgal": 1.5408248552988102,
+   "cost_musd": 98.17855691106834,
+   "co2_kt": 83.81680861110115,
+   "hours_tower": 4558,
+   "hours_pit_empty": 0,
+   "hours_unmet_demand": 0
+  }
+ }
+]

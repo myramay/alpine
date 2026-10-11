@@ -2,5 +2,7 @@
 .venv/
 __pycache__/
 .pytest_cache/
-outputs/runs/
+outputs/runs/*.csv
 .DS_Store
+*.pyc
+out/

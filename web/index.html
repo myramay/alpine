@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Alpine</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Cpath d=%27M4 26 L16 6 L28 26 Z%27 fill=%27%23f2a93b%27/%3E%3C/svg%3E">
+<style>
+  :root { --bg:#0f1115; --panel:#171a21; --line:#2a2f3a; --ink:#e8eaf0; --muted:#8b93a7; --accent:#f2a93b; --good:#58c48b; --bad:#e5655a;
+          --sell:#58c48b; --store:#6ea8fe; --dry:#8b93a7; --tower:#e5655a; --water:#4cc3e6; --mono: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.45 system-ui, -apple-system, Segoe UI, sans-serif; }
+  header { display:flex; align-items:center; gap:16px; padding:16px 24px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  header h1 { margin:0; font-size:20px; letter-spacing:.02em; }
+  header .sub { color:var(--muted); font-size:14px; }
+  header .right { margin-left:auto; display:flex; gap:10px; align-items:center; font-size:13px; color:var(--muted); }
+  select { background:var(--panel); color:var(--ink); border:1px solid var(--line); border-radius:8px; padding:6px 10px; font-size:14px; }
+  .dot { width:8px; height:8px; border-radius:50%; background:var(--bad); display:inline-block; }
+  .dot.ok { background:var(--good); }
+  nav { display:flex; gap:4px; padding:12px 24px 0; }
+  nav button { background:none; border:1px solid var(--line); color:var(--muted); padding:8px 14px; border-radius:8px 8px 0 0; cursor:pointer; font-size:14px; }
+  nav button.on { color:var(--ink); border-bottom-color:var(--panel); background:var(--panel); }
+  main { padding:0 24px 40px; }
+  section { display:none; background:var(--panel); border:1px solid var(--line); border-radius:0 12px 12px 12px; padding:24px; }
+  section.on { display:block; }
+  h2 { font-size:15px; color:var(--muted); font-weight:500; text-transform:uppercase; letter-spacing:.08em; margin:28px 0 12px; }
+  h2:first-child { margin-top:0; }
+  .metrics { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px,1fr)); gap:16px; }
+  .metric { border:1px solid var(--line); border-radius:12px; padding:18px; }
+  .metric .name { color:var(--muted); font-size:13px; text-transform:uppercase; letter-spacing:.08em; }
+  .metric .value { font-size:40px; font-weight:600; margin:6px 0 2px; }
+  .metric .unit { color:var(--muted); font-size:13px; }
+  .metric .meaning { margin-top:10px; font-size:14px; }
+  .query { margin-top:12px; font-family:var(--mono); font-size:12.5px; color:var(--muted); background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:10px; white-space:pre-wrap; word-break:break-word; }
+  form { display:flex; gap:10px; }
+  input[type=text] { flex:1; background:var(--bg); border:1px solid var(--line); color:var(--ink); padding:12px 14px; border-radius:10px; font-size:16px; }
+  button.go { background:var(--accent); color:#1a1200; border:0; padding:10px 16px; border-radius:10px; font-weight:600; cursor:pointer; font-size:14px; }
+  button.go[disabled] { opacity:.5; cursor:wait; }
+  .answer { margin-top:18px; font-size:20px; }
+  .examples { margin-top:14px; display:flex; flex-wrap:wrap; gap:8px; }
+  .examples button { background:none; border:1px solid var(--line); color:var(--muted); padding:6px 10px; border-radius:999px; font-size:13px; cursor:pointer; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th, td { text-align:left; padding:9px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--muted); font-weight:500; font-size:13px; }
+  td.n, th.n { text-align:right; font-variant-numeric:tabular-nums; }
+  td.q { font-family:var(--mono); font-size:12.5px; color:var(--muted); }
+  .pill { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; border:1px solid var(--line); }
+  .pill.good { color:var(--good); border-color:var(--good); }
+  .status { color:var(--muted); font-size:13px; margin-top:10px; }
+  .err { color:var(--bad); }
+  .chart { width:100%; height:auto; display:block; }
+  .legend { display:flex; gap:16px; flex-wrap:wrap; font-size:13px; color:var(--muted); margin-top:8px; }
+  .legend i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:6px; vertical-align:-1px; }
+  .pos { color:var(--bad); } .neg { color:var(--good); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Alpine</h1>
+  <span class="sub">the thermal layer · Lake Hawkeye, Lansing NY · 100 MW IT</span>
+  <div class="right">
+    <label>Scenario <select id="scenario"></select></label>
+    <span><span class="dot" id="dot"></span> <span id="api-label">api</span></span>
+  </div>
+</header>
+<nav>
+  <button class="on" data-tab="report">Report</button>
+  <button data-tab="ask">Ask</button>
+  <button data-tab="decisions">Decisions</button>
+  <button data-tab="model">Model</button>
+</nav>
+<main>
+  <section id="report" class="on">
+    <div class="metrics" id="metrics"></div>
+    <div class="status" id="report-status">Loading…</div>
+
+    <h2>Day by day: where the heat went, and the water it cost</h2>
+    <svg id="daily" class="chart" viewBox="0 0 960 300" role="img" aria-label="Daily heat split and water use"></svg>
+    <div class="legend">
+      <span><i style="background:var(--sell)"></i>sold to the network</span>
+      <span><i style="background:var(--store)"></i>stored</span>
+      <span><i style="background:var(--dry)"></i>rejected, dry</span>
+      <span><i style="background:var(--tower)"></i>rejected, towers</span>
+      <span><i style="background:var(--water)"></i>water, gal/day (line, right axis)</span>
+    </div>
+    <div class="status" id="daily-status"></div>
+
+    <h2>The agent's lever: towers vs. dry condensers on the chillers, same year</h2>
+    <table><thead><tr><th>Metric</th><th class="n">Towers (default)</th><th class="n">Dry condensers</th><th class="n">Change</th></tr></thead>
+      <tbody id="compare-body"></tbody></table>
+    <div class="status" id="compare-status">Loading…</div>
+  </section>
+
+  <section id="ask">
+    <form id="ask-form">
+      <input type="text" id="q" placeholder="Ask the site anything about this year…" autocomplete="off">
+      <button class="go" id="go">Ask</button>
+    </form>
+    <div class="examples" id="examples"></div>
+    <div class="answer" id="answer"></div>
+    <div class="query" id="answer-query" style="display:none"></div>
+    <div class="status" id="ask-status"></div>
+  </section>
+
+  <section id="decisions">
+    <table><thead><tr><th>Day</th><th>Asked</th><th>Answer</th><th>Decision</th></tr></thead>
+      <tbody id="decisions-body"></tbody></table>
+    <div class="status" id="decisions-status">Loading…</div>
+  </section>
+
+  <section id="model">
+    <h2>Which assumptions move the answer (±25%, one at a time)</h2>
+    <button class="go" id="sens-go">Run sensitivity (about 10 s)</button>
+    <table style="margin-top:14px"><thead><tr><th>Constant</th><th class="n">Base</th><th class="n">WUE −25%</th><th class="n">WUE +25%</th><th class="n">ERF −25%</th><th class="n">ERF +25%</th><th class="n">Cost −25%</th><th class="n">Cost +25%</th></tr></thead>
+      <tbody id="sens-body"></tbody></table>
+    <div class="status" id="sens-status">Every constant marked "assumption - verify" in config/site.yaml is a candidate. Cells show the % change in the year's result.</div>
+  </section>
+</main>
+
+<script>
+const API_BASE = (new URLSearchParams(location.search).get('api')) || window.API_BASE || (location.protocol.startsWith('http') ? location.origin : 'http://localhost:8000');
+document.getElementById('api-label').textContent = API_BASE.replace(/^https?:\/\//, '');
+
+const EXAMPLES = [
+  'What was the PUE for the year?',
+  'How many gallons of water did the site use in the heat wave?',
+  'What share of the heat was reused in January?',
+  'How many hours was the pit empty?',
+  'Which hour had the highest cost, and why?',
+];
+const MEANING = {
+  PUE: 'Total facility energy per unit of IT energy. Lower is better; liquid cooling plus heat export keeps it near 1.1.',
+  WUE: 'Litres of water per IT kWh. The number the town asks about: every hour the chiller condensers run on towers raises it; dry condensers take it to near zero for more electricity.',
+  ERF: 'Share of energy reused as heat. Germany requires 10% from July 2026, 20% by 2028, for new data centers.',
+};
+const RUNS = { byScenario: {}, current: null };
+
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('nav button').forEach(x => x.classList.toggle('on', x === b));
+  document.querySelectorAll('main section').forEach(s => s.classList.toggle('on', s.id === b.dataset.tab));
+});
+
+async function get(path, opts) {
+  const r = await fetch(API_BASE + path, opts);
+  if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
+  return r.json();
+}
+
+async function init() {
+  try {
+    await get('/health'); document.getElementById('dot').classList.add('ok');
+    const d = await get('/runs');
+    for (const r of d.runs) RUNS.byScenario[r.scenario] = r;      // newest last wins
+    const sel = document.getElementById('scenario');
+    sel.innerHTML = Object.keys(RUNS.byScenario).map(s => `<option value="${s}">${s.replace('_', ' ')}</option>`).join('');
+    sel.value = RUNS.byScenario.normal ? 'normal' : sel.options[0]?.value;
+    sel.onchange = () => selectScenario(sel.value);
+    await selectScenario(sel.value);
+  } catch (e) {
+    document.getElementById('report-status').innerHTML = `<span class="err">API unreachable at ${esc(API_BASE)}: ${esc(e.message)}. Start it with <code>uvicorn server:app --port 8000</code> and run <code>python thermal.py</code> once.</span>`;
+  }
+  loadDecisions();
+}
+
+async function selectScenario(s) {
+  RUNS.current = RUNS.byScenario[s];
+  renderReport(RUNS.current);
+  loadDaily(RUNS.current.run_id);
+  loadCompare(s);
+}
+
+function renderReport(run) {
+  const s = run.summary, el = document.getElementById('metrics');
+  const q = n => `SELECT ${n} FROM events WHERE run_id = '${run.run_id}'`;
+  const metrics = [
+    { name:'PUE', value:s.pue, unit:'facility kWh / IT kWh', query:q('sum(power_kwh) / sum(it_kwh)') },
+    { name:'WUE', value:s.wue_l_per_kwh, unit:'L / IT kWh', query:q('sum(water_gal) * 3.785 / sum(it_kwh)') },
+    { name:'ERF', value:s.erf, unit:'heat reused / energy in', query:q('sum(heat_exported_mw) / (sum(power_kwh) / 1000)') },
+  ];
+  el.innerHTML = metrics.map(m => `
+    <div class="metric"><div class="name">${m.name}</div><div class="value">${fmt(m.value)}</div><div class="unit">${m.unit}</div>
+    <div class="meaning">${MEANING[m.name]}</div><div class="query">${esc(m.query)}</div></div>`).join('');
+  document.getElementById('report-status').textContent =
+    `${run.scenario.replace('_',' ')} · ${fmt(s.heat_available_gwh)} GWh captured, ${fmt(s.heat_exported_gwh)} GWh sold, ${fmt(s.water_mgal)} Mgal water, $${fmt(s.cost_musd)}M net cost, ${fmt(s.co2_kt)} kt CO2 · computed ${run.computed_at}`;
+  loadLiveReport(run);
+}
+
+// Overlay the three numbers with the live Keewano result for this run (value + the query Keewano ran).
+// Runs that were never pushed to Keewano keep the local numbers above.
+async function loadLiveReport(run) {
+  try {
+    const d = await get(`/report?run_id=${encodeURIComponent(run.run_id)}`);
+    if (!d.metrics || d.run_id !== run.run_id || d.source !== 'keewano') return;
+    const el = document.getElementById('metrics');
+    el.innerHTML = d.metrics.map(m => `
+      <div class="metric"><div class="name">${m.name}</div><div class="value">${fmt(m.value)}</div><div class="unit">${m.unit}</div>
+      <div class="meaning">${MEANING[m.name]}</div><div class="query">${esc(m.query)}</div></div>`).join('');
+    const st = document.getElementById('report-status');
+    st.textContent += d.cached ? ` · Keewano: cached from the last query (${d.computed_at})` : ` · live from Keewano ${d.computed_at}`;
+  } catch (e) { /* not in Keewano (local-only run) or Keewano unreachable: keep the local numbers */ }
+}
+
+async function loadDaily(run_id) {
+  const svg = document.getElementById('daily'), st = document.getElementById('daily-status');
+  try {
+    const d = await get(`/events?run_id=${encodeURIComponent(run_id)}&daily=1`);
+    drawDaily(svg, d.rows);
+    const peak = d.rows.reduce((a, r) => r.water_gal > a.water_gal ? r : a, d.rows[0]);
+    st.textContent = `${d.rows.length} days, ${(d.rows.length * 24).toLocaleString()} simulated hours · peak water day ${peak.day} at ${Math.round(peak.water_gal).toLocaleString()} gal`;
+  } catch (e) { st.innerHTML = `<span class="err">${esc(e.message)}</span>`; }
+}
+
+function drawDaily(svg, rows) {
+  const W = 960, H = 300, L = 54, R = 64, T = 12, B = 28, iw = W - L - R, ih = H - T - B;
+  const n = rows.length, bw = iw / n;
+  const heatMax = Math.max(...rows.map(r => r.heat_available_mw));
+  const waterMax = Math.max(1, ...rows.map(r => r.water_gal));
+  const y = v => T + ih - v / heatMax * ih, yw = v => T + ih - v / waterMax * ih;
+  let out = '';
+  rows.forEach((r, i) => {
+    const x = L + i * bw, parts = [['sell', r.heat_exported_mw], ['store', Math.max(0, r.heat_stored_mw)], ['dry', r.dry_mw], ['tower', r.heat_tower_mw]];
+    let acc = 0;
+    for (const [k, v] of parts) { if (v <= 0) continue; out += `<rect x="${x}" y="${y(acc + v)}" width="${Math.max(bw, .5)}" height="${y(acc) - y(acc + v)}" fill="var(--${k})"/>`; acc += v; }
+    if (r.scenario !== 'normal') out += `<rect x="${x}" y="${T}" width="${bw}" height="${ih}" fill="var(--accent)" fill-opacity=".12"/>`;
+  });
+  out += `<polyline fill="none" stroke="var(--water)" stroke-width="1.5" points="${rows.map((r, i) => `${L + i * bw + bw / 2},${yw(r.water_gal)}`).join(' ')}"/>`;
+  const months = ['J','F','M','A','M','J','J','A','S','O','N','D'];
+  months.forEach((m, i) => out += `<text x="${L + (i + .5) * iw / 12}" y="${H - 8}" fill="var(--muted)" font-size="12" text-anchor="middle">${m}</text>`);
+  [0, .5, 1].forEach(f => {
+    out += `<text x="${L - 6}" y="${y(f * heatMax) + 4}" fill="var(--muted)" font-size="11" text-anchor="end">${Math.round(f * heatMax / 24)} MW</text>`;
+    out += `<text x="${L + iw + 6}" y="${yw(f * waterMax) + 4}" fill="var(--water)" font-size="11">${Math.round(f * waterMax / 1000)}k gal</text>`;
+    out += `<line x1="${L}" x2="${L + iw}" y1="${y(f * heatMax)}" y2="${y(f * heatMax)}" stroke="var(--line)"/>`;
+  });
+  svg.innerHTML = out;
+}
+
+async function loadCompare(scenario) {
+  const body = document.getElementById('compare-body'), st = document.getElementById('compare-status');
+  st.textContent = 'Running the year twice…';
+  try {
+    const d = await get(`/compare?scenario=${encodeURIComponent(scenario)}`);
+    const label = { pue:'PUE', wue_l_per_kwh:'WUE (L/kWh)', erf:'ERF', water_mgal:'Water (Mgal/yr)', cost_musd:'Net cost ($M/yr)', co2_kt:'CO2 (kt/yr)', hours_tower:'Hours on towers', share_reused:'Share of heat reused' };
+    body.innerHTML = d.rows.map(r => `<tr><td>${label[r.metric] || r.metric}</td><td class="n">${fmt(r.default)}</td><td class="n">${fmt(r.prefer_dry)}</td>
+      <td class="n ${r.delta_pct > 0.05 ? 'pos' : r.delta_pct < -0.05 ? 'neg' : ''}">${r.delta_pct == null ? '—' : (r.delta_pct > 0 ? '+' : '') + r.delta_pct.toFixed(1) + '%'}</td></tr>`).join('');
+    const w = d.rows.find(r => r.metric === 'water_mgal'), c = d.rows.find(r => r.metric === 'cost_musd');
+    st.textContent = `Dry condensers: ${fmt(w.default - w.prefer_dry)} million gallons less water for $${fmt(c.prefer_dry - c.default)}M more electricity a year. The daily agent decides when that trade is worth it.`;
+  } catch (e) { st.innerHTML = `<span class="err">${esc(e.message)}</span>`; }
+}
+
+document.getElementById('sens-go').onclick = async () => {
+  const body = document.getElementById('sens-body'), st = document.getElementById('sens-status'), b = document.getElementById('sens-go');
+  b.disabled = true; st.textContent = 'Running 15 years of simulation…';
+  try {
+    const d = await get(`/sensitivity?scenario=${encodeURIComponent(RUNS.current?.scenario || 'normal')}`);
+    const pct = v => `<td class="n ${Math.abs(v) < 0.5 ? '' : v > 0 ? 'pos' : 'neg'}">${v > 0 ? '+' : ''}${v.toFixed(1)}%</td>`;
+    body.innerHTML = d.rows.map(r => `<tr><td class="q">${esc(r.knob)}</td><td class="n">${fmt(r.base)}</td>${pct(r.wue_low_pct)}${pct(r.wue_high_pct)}${pct(r.erf_low_pct)}${pct(r.erf_high_pct)}${pct(r.cost_low_pct)}${pct(r.cost_high_pct)}</tr>`).join('');
+    st.textContent = 'Read across a row: a big swing means that constant needs a real quote or a meter before anyone relies on the number.';
+  } catch (e) { st.innerHTML = `<span class="err">${esc(e.message)}</span>`; }
+  b.disabled = false;
+};
+
+async function loadDecisions() {
+  const body = document.getElementById('decisions-body'), st = document.getElementById('decisions-status');
+  try {
+    const d = await get('/decisions');
+    body.innerHTML = d.decisions.map(x => `<tr><td>${x.day}</td><td class="q">${esc(x.question)}</td><td>${esc(x.answer)}</td>
+      <td><span class="pill ${x.changed ? 'good' : ''}">${esc(x.decision)}</span></td></tr>`).join('');
+    st.textContent = d.decisions.length ? `${d.decisions.length} daily decisions` : 'No decisions yet. Run agent.py.';
+  } catch (e) { st.innerHTML = `<span class="err">Decisions unavailable: ${esc(e.message)}</span>`; }
+}
+
+document.getElementById('examples').innerHTML = EXAMPLES.map(q => `<button type="button">${esc(q)}</button>`).join('');
+document.querySelectorAll('#examples button').forEach(b => b.onclick = () => { document.getElementById('q').value = b.textContent; ask(); });
+document.getElementById('ask-form').onsubmit = e => { e.preventDefault(); ask(); };
+
+async function ask() {
+  const q = document.getElementById('q').value.trim(); if (!q) return;
+  const go = document.getElementById('go'), ans = document.getElementById('answer'), qq = document.getElementById('answer-query'), st = document.getElementById('ask-status');
+  go.disabled = true; ans.textContent = ''; qq.style.display = 'none'; st.textContent = 'Asking Keewano…';
+  const t0 = performance.now();
+  try {
+    const d = await get('/ask', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ question: q }) });
+    ans.textContent = d.answer; qq.textContent = d.query; qq.style.display = 'block';
+    const nrows = Array.isArray(d.rows) ? d.rows.length : d.rows;
+    st.textContent = `${((performance.now() - t0) / 1000).toFixed(1)} s${nrows != null ? ' · ' + nrows + ' rows' : ''}`;
+  } catch (e) { st.innerHTML = `<span class="err">${esc(e.message)}</span>`; }
+  go.disabled = false;
+}
+
+function fmt(v) { if (v == null) return '—'; if (Math.abs(v) >= 1000) return Math.round(v).toLocaleString(); if (Math.abs(v) >= 100) return v.toFixed(0); if (Math.abs(v) >= 10) return v.toFixed(1); return (Math.round(v * 1000) / 1000).toString(); }
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+init();
+</script>
+</body>
+</html>

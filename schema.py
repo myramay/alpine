@@ -50,6 +50,13 @@ EVENTS = [
     (2027, "policy_change", "string", "agent policy change + reason, <=256 chars"),
     (2028, "policy_dry_boost_pct", "uint", "active dry_boost policy, percent"),
     (2029, "policy_discharge_floor_pct", "uint", "active discharge floor policy, percent SOC"),
+    # Alpine sim (thermal.py) additions; append-only
+    (2030, "policy_prefer_dry", "uint", "1 if chiller condensers run on dry coolers (no water), else 0 (towers)"),
+    (2031, "policy_storage_reserve_pct", "uint", "pit SOC floor for discharge, percent"),
+    (2032, "policy_tower_cap_mw", "uint", "cap on condenser heat sent to towers, MW (9999 = no cap)"),
+    (2033, "heat_delivered_kw", "uint", "heat delivered at the buildings after pipe loss and heat pump, kW"),
+    (2034, "electricity_cost_usd", "price_usd_cent", "facility electricity cost this hour (cents)"),
+    (2035, "water_cost_usd", "price_usd_cent", "water cost this hour (cents)"),
 ]
 
 EVENT_ID = {name: eid for eid, name, _, _ in EVENTS}
@@ -65,6 +72,44 @@ HOURLY_MEASURES = [
     "it_kwh", "cooling_kwh", "heat_pump_kwh", "pump_kwh", "power_kwh", "cost_usd",
     "heat_revenue_usd", "co2_kg", "co2_avoided_kg", "storage_soc_pct",
 ]
+
+
+# Alpine sim (thermal.py): its policy knobs replace the basic sim's in the hourly context, and it
+# adds delivered heat and the cost split. cost_usd there is NET (electricity + water - heat sales).
+ALPINE_CONTEXT = ["hour", "ambient_k", "decision", "policy_prefer_dry", "policy_storage_reserve_pct",
+                  "policy_tower_cap_mw"]
+ALPINE_MEASURES = HOURLY_MEASURES + ["heat_delivered_kw", "electricity_cost_usd", "water_cost_usd"]
+
+
+def to_int(v) -> int:
+    return max(0, int(round(float(v))))
+
+
+def rows_to_events(rows: list[dict], run_id: str, scenario: str, policy_notes: dict | None = None,
+                   context: list[str] = ALPINE_CONTEXT, measures: list[str] = ALPINE_MEASURES) -> list["Event"]:
+    """Hourly rows already in schema units (kW, kWh, gal, kg, cents, pct) -> chronological events.
+    Each row needs hour, day, month and every name in context + measures. price_usd_cent values may be
+    negative (signed); every other number is clamped at 0."""
+    policy_notes = policy_notes or {}
+    events, last_day, last_month = [], None, None
+    for r in rows:
+        h, day = int(r["hour"]), int(r["day"])
+        ts, out = BASE_TS + h * 3600, []
+        if h == rows[0]["hour"]:
+            out += [("run_id", run_id), ("scenario", scenario)]
+        if day != last_day:
+            out.append(("day", day)); last_day = day
+        if r["month"] != last_month:
+            out.append(("month", int(r["month"]))); last_month = r["month"]
+        out += [(k, r[k]) for k in context]
+        if h % 24 == 0 and day in policy_notes:
+            out.append(("policy_change", str(policy_notes[day])[:256]))
+        out += [(k, r[k]) for k in measures]
+        for i, (k, v) in enumerate(out):
+            dt = EVENT_TYPE[k]
+            val = (str(v) if dt == "string" else int(round(float(v))) if dt == "price_usd_cent" else to_int(v))
+            events.append(Event(k, val, ts + i))
+    return events
 
 
 def entity_id(site_id: str, run_id: str) -> str:
