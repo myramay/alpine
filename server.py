@@ -73,7 +73,7 @@ def vendor(name: str):
     p = (WEB / "vendor" / name).resolve()
     if p.parent != (WEB / "vendor").resolve() or not p.exists():
         raise HTTPException(404)
-    return FileResponse(p, media_type="application/javascript")
+    return FileResponse(p, media_type="text/css" if name.endswith(".css") else "application/javascript")
 
 
 @app.get("/")
