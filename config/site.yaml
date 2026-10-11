@@ -17,7 +17,8 @@ data_center:
   pue_base: 1.15                    # liquid-cooled; assumption - verify
 
 cooling:
-  chiller_cop: 5.0                  # challenge spec
+  chiller_cop: 5.0                  # water-cooled condenser (towers); challenge spec
+  chiller_cop_dry: 3.8              # air-cooled / dry condenser, higher condensing temperature; assumption - verify
   dry_cooler_capacity_mw: 60.0      # thermal; assumption - verify (sized ~0.8 x mean heat)
   dry_cooler_kw_per_mw_th: 20.0     # fan power per MW rejected; assumption - verify
   tower_kw_per_mw_th: 10.0          # fan + pump power per MW rejected; assumption - verify

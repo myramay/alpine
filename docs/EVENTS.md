@@ -8,7 +8,7 @@ One event = a name and one typed value. Entity id is `lansing:<run_id>`. Every e
 | `heat_exported_mw` | float | MW thermal delivered to the heat network | thermal.py |
 | `heat_stored_mw` | float | MW thermal into the pit (negative = discharge) | thermal.py |
 | `heat_rejected_mw` | float | MW thermal rejected to air (dry cooler + tower) | thermal.py |
-| `heat_tower_mw` | float | MW thermal of that rejected through evaporative towers (the part that uses water) | thermal.py |
+| `heat_tower_mw` | float | MW thermal rejected through evaporative towers this hour: captured-heat overflow plus chiller condenser heat when the policy is not `prefer_dry`. The part that uses water. | thermal.py |
 | `water_gal` | float | gallons evaporated this hour (towers only) | thermal.py |
 | `power_kwh` | float | total facility kWh this hour: IT + cooling + pumps + heat pumps | thermal.py |
 | `it_kwh` | float | IT kWh this hour | thermal.py |
