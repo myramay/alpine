@@ -283,6 +283,22 @@ function renderReport(run) {
   countUp(el);
   document.getElementById('report-status').textContent =
     `${run.scenario.replace('_',' ')} · ${fmt(s.heat_available_gwh)} GWh captured, ${fmt(s.heat_exported_gwh)} GWh sold, ${fmt(s.water_mgal)} Mgal water, $${fmt(s.cost_musd)}M net cost, ${fmt(s.co2_kt)} kt CO2 · computed ${run.computed_at}`;
+  loadLiveReport(run);
+}
+
+// Overlay the three numbers with the live Keewano result for this run (value + the query Keewano ran).
+// Runs that were never pushed to Keewano keep the local numbers above.
+async function loadLiveReport(run) {
+  try {
+    const d = await get(`/report?run_id=${encodeURIComponent(run.run_id)}`);
+    if (!d.metrics || d.run_id !== run.run_id || d.source !== 'keewano') return;
+    const el = document.getElementById('metrics');
+    el.innerHTML = d.metrics.map(m => `
+      <div class="metric"><div class="name">${m.name}</div><div class="value">${fmt(m.value)}</div><div class="unit">${m.unit}</div>
+      <div class="meaning">${MEANING[m.name]}</div><div class="query">${esc(m.query)}</div></div>`).join('');
+    const st = document.getElementById('report-status');
+    st.textContent += d.cached ? ` · Keewano: cached from the last query (${d.computed_at})` : ` · live from Keewano ${d.computed_at}`;
+  } catch (e) { /* not in Keewano (local-only run) or Keewano unreachable: keep the local numbers */ }
 }
 
 async function loadDaily(run_id) {
@@ -367,7 +383,8 @@ async function ask() {
   try {
     const d = await get('/ask', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ question: q }) });
     ans.textContent = d.answer; qq.textContent = d.query; qq.style.display = 'block';
-    st.textContent = `${((performance.now() - t0) / 1000).toFixed(1)} s${d.rows != null ? ' · ' + d.rows + ' rows' : ''}`;
+    const nrows = Array.isArray(d.rows) ? d.rows.length : d.rows;
+    st.textContent = `${((performance.now() - t0) / 1000).toFixed(1)} s${nrows != null ? ' · ' + nrows + ' rows' : ''}`;
   } catch (e) { st.innerHTML = `<span class="err">${esc(e.message)}</span>`; }
   go.disabled = false;
 }

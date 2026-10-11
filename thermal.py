@@ -64,9 +64,16 @@ def _scenario_window(scenario: str) -> tuple[int, int, dict]:
 
 
 def run(scenario: str = "normal", push: bool = True, policy: dict | None = None,
-        policy_by_day: dict[int, dict] | None = None, save: bool = True) -> dict:
-    """Simulate a typical year. policy_by_day lets agent.py change the policy from a given day on.
-    save=False (what-if runs from /compare and /sensitivity) writes nothing to out/."""
+        policy_by_day: dict[int, dict] | None = None, policy_notes: dict[int, str] | None = None,
+        run_id: str | None = None, save: bool | None = None) -> dict:
+    """Simulate a typical year. policy_by_day lets agent.py change the policy from a given day on;
+    policy_notes (day -> reason) become policy_change events in Keewano.
+
+    What gets written:
+      out/run_<id>.json + out/events_<id>.csv   (the web page's runs)        unless save=False
+      outputs/runs/<id>.csv + index.json        (runs that exist in Keewano) when pushed, or save=True
+    save=None (default) means "same as push" for the Keewano index. What-if calls (/compare,
+    /sensitivity, tests) pass save=False so nothing is written and nothing shows up as a run."""
     df = load_inputs()
     c, hn, st, pr, em = CFG["cooling"], CFG["heat_network"], CFG["storage"], CFG["prices"], CFG["emissions"]
     dc = CFG["data_center"]
@@ -77,8 +84,9 @@ def run(scenario: str = "normal", push: bool = True, policy: dict | None = None,
     deliver_frac = 1.0 - hn["pipe_loss_per_km"] * hn["route_km"]
     cap = st["capacity_mwh"]
     soc = st["initial_soc"]
-    run_id = f"{scenario}-{datetime.now(timezone.utc):%m%d%H%M}-{uuid.uuid4().hex[:4]}"
+    run_id = run_id or f"{scenario}-{datetime.now(timezone.utc):%m%d%H%M}-{uuid.uuid4().hex[:4]}"
     events: list[dict] = []
+    kw_rows: list[dict] = []   # the same hour in Keewano units (schema.py), for ingest and the agent
     tot = {k: 0.0 for k in ("avail", "export", "store_in", "store_out", "reject", "dry", "tower", "water",
                              "power", "it", "cost", "co2", "delivered", "hours_tower", "hours_pit_empty",
                              "hours_unmet")}
@@ -153,6 +161,25 @@ def run(scenario: str = "normal", push: bool = True, policy: dict | None = None,
         }
         events.extend({"name": n, "value": (round(v, 4) if isinstance(v, float) else v), "tags": tags}
                       for n, v in vals.items())
+        elec_usd = (power_kwh / 1000.0) * pr["electricity_usd_per_mwh"]
+        water_usd = water_gal / 1000.0 * pr["water_usd_per_kgal"]
+        kw_rows.append({
+            "hour": h, "day": day, "month": int(r.month), "ambient_k": amb + 273.15, "decision": decision,
+            "policy_prefer_dry": int(bool(pol["prefer_dry"])),
+            "policy_storage_reserve_pct": pol["storage_reserve"] * 100,
+            "policy_tower_cap_mw": min(pol["tower_cap_mw"], 9999),
+            "heat_available_kw": avail * 1000, "demand_kw": demand * 1000, "heat_exported_kw": export * 1000,
+            "heat_stored_kw": store * 1000, "heat_discharged_kw": discharge * 1000,
+            "heat_rejected_kw": reject * 1000, "reject_dry_kw": (dry + cond_dry) * 1000,
+            "reject_tower_kw": tower_total * 1000, "unmet_demand_kw": unmet_src / src_per_delivered * 1000,
+            "water_gal": water_gal, "it_kwh": it_kwh, "cooling_kwh": chiller_kwh + fan_kwh,
+            "heat_pump_kwh": hp_elec * 1000.0, "pump_kwh": pump_kwh, "power_kwh": power_kwh,
+            "cost_usd": cost * 100, "heat_revenue_usd": delivered * hn["heat_price_usd_per_mwh"] * 100,
+            "co2_kg": (power_kwh / 1000.0) * em["grid_t_per_mwh"] * 1000,
+            "co2_avoided_kg": delivered / BOILER_EFF * em["gas_boiler_t_per_mwh"] * 1000,
+            "storage_soc_pct": soc * 100, "heat_delivered_kw": delivered * 1000,
+            "electricity_cost_usd": elec_usd * 100, "water_cost_usd": water_usd * 100,
+        })
 
         tot["avail"] += avail; tot["export"] += export; tot["store_in"] += store; tot["store_out"] += discharge
         tot["reject"] += reject; tot["dry"] += dry + cond_dry; tot["tower"] += tower_total; tot["water"] += water_gal
@@ -178,7 +205,7 @@ def run(scenario: str = "normal", push: bool = True, policy: dict | None = None,
         "hours_pit_empty": int(tot["hours_pit_empty"]),
         "hours_unmet_demand": int(tot["hours_unmet"]),
     }
-    if save:
+    if save is not False:
         out = Path("out"); out.mkdir(exist_ok=True)
         (out / f"run_{run_id}.json").write_text(json.dumps({
             "run_id": run_id, "scenario": scenario, "policy": pol,
@@ -186,18 +213,48 @@ def run(scenario: str = "normal", push: bool = True, policy: dict | None = None,
         pd.DataFrame([{"name": e["name"], "value": e["value"], **e["tags"]} for e in events]) \
             .to_csv(out / f"events_{run_id}.csv", index=False)
 
+    kw_run = keewano_run(kw_rows, run_id, scenario, policy_notes)
+    if push if save is None else save:
+        save_hourly(kw_rows, run_id, scenario, summary, pol)
     sent = 0
     if push:
         import keewano
-        sent = keewano.send(events, run_id)
-    return {"run_id": run_id, "n_events": len(events), "n_sent": sent, "summary": summary, "events": events}
+        sent = keewano.send_run(kw_run)["accepted"]
+    return {"run_id": run_id, "n_events": len(events), "n_sent": sent, "summary": summary, "events": events,
+            "kw_run": kw_run}
+
+
+def keewano_run(kw_rows: list[dict], run_id: str, scenario: str, policy_notes: dict | None = None):
+    """The run as Keewano integer events (schema.py): what actually gets ingested."""
+    import schema
+    return schema.Run(run_id=run_id, scenario=scenario, site_id=CFG["site"]["id"],
+                      events=schema.rows_to_events(kw_rows, run_id, scenario, policy_notes), hourly=kw_rows)
+
+
+def save_hourly(kw_rows: list[dict], run_id: str, scenario: str, summary: dict, policy: dict,
+                out_dir: str = "outputs/runs") -> Path:
+    """Hourly rows in Keewano units to outputs/runs/<run_id>.csv plus an index.json entry; agent.py reads these."""
+    d = Path(out_dir); d.mkdir(parents=True, exist_ok=True)
+    path = d / f"{run_id}.csv"
+    pd.DataFrame(kw_rows).to_csv(path, index=False)
+    idx_path = d / "index.json"
+    try:
+        idx = json.loads(idx_path.read_text())
+    except (FileNotFoundError, ValueError):
+        idx = []
+    idx = [e for e in idx if e.get("run_id") != run_id]
+    idx.append({"run_id": run_id, "scenario": scenario, "sim": "alpine", "policy": policy,
+                "created": datetime.now(timezone.utc).isoformat(timespec="seconds"), "totals": summary})
+    idx_path.write_text(json.dumps(idx, indent=1, default=str))
+    return path
 
 
 if __name__ == "__main__":
     import argparse
     ap = argparse.ArgumentParser()
-    ap.add_argument("--scenario", default="normal", choices=list(CFG["scenarios"]))
+    ap.add_argument("--scenario", default="normal", choices=list(CFG["scenarios"]) + ["all"])
     ap.add_argument("--push", action="store_true")
     a = ap.parse_args()
-    r = run(scenario=a.scenario, push=a.push)
-    print(json.dumps({k: r[k] for k in ("run_id", "n_events", "n_sent", "summary")}, indent=2))
+    for sc in (list(CFG["scenarios"]) if a.scenario == "all" else [a.scenario]):
+        r = run(scenario=sc, push=a.push, save=True)
+        print(json.dumps({k: r[k] for k in ("run_id", "n_events", "n_sent", "summary")}, indent=2))

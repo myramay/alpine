@@ -1,17 +1,19 @@
-"""Alpine API. /run, /ask, /report, /decisions.
+"""Alpine API. /run, /ask, /report, /decisions, /runs, /events, /compare, /sensitivity, /jobs, /health.
 
-Until keewano.py and agent.py are wired, /report and /decisions serve the last run's
-numbers from out/ so the web page works end to end. Set ALPINE_STUB=0 to require Keewano.
+/report asks Keewano live (agent.report); if Keewano fails it serves the last live result for that
+run (outputs/report_cache.json, "cached": true), and failing that the last local run's numbers from out/.
 """
 from __future__ import annotations
 
 import json
 import os
+import threading
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -19,6 +21,28 @@ from pydantic import BaseModel
 load_dotenv()
 OUT = Path("out")
 OUT.mkdir(exist_ok=True)
+
+ROOT = Path(__file__).resolve().parent
+RUNS_DIR = ROOT / "outputs" / "runs"            # Keewano runs: <run_id>.csv, index.json, decisions_<id>.json
+REPORT_CACHE_PATH = ROOT / "outputs" / "report_cache.json"
+ENV_VARS = ["ANTHROPIC_API_KEY", "KEEWANO_API_KEY", "KEEWANO_PAT", "KEEWANO_MCP_URL",
+            "KEEWANO_EMAIL", "KEEWANO_PROJECT_ID"]
+_lock = threading.Lock()
+JOBS: dict[str, dict] = {}
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def _load_report_cache() -> dict:
+    try:
+        return json.loads(REPORT_CACHE_PATH.read_text())
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+_report_cache: dict[str, dict] = _load_report_cache()
 
 app = FastAPI(title="Alpine")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -60,6 +84,7 @@ def index():
 
 class Ask(BaseModel):
     question: str
+    run_id: str | None = None
 
 
 def _latest_run() -> dict | None:
@@ -67,20 +92,69 @@ def _latest_run() -> dict | None:
     return json.loads(runs[-1].read_text()) if runs else None
 
 
+def _run_job(run_id: str, scenario: str, push: bool, sim: str) -> None:
+    JOBS[run_id].update(status="simulating")
+    try:
+        if sim == "basic":
+            import keewano
+            import thermal_basic
+            r = thermal_basic.simulate(scenario=scenario, run_id=run_id)
+            JOBS[run_id].update(status="saving", path=str(thermal_basic.save_run(r)))
+            if push:
+                JOBS[run_id].update(status="pushing")
+                JOBS[run_id].update(push=keewano.send_run(r))
+        else:
+            import thermal
+            r = thermal.run(scenario=scenario, push=push, run_id=run_id, save=True)
+            JOBS[run_id].update(events=r["n_events"], sent=r["n_sent"], summary=r["summary"])
+        JOBS[run_id].update(status="done", finished=_now())
+    except Exception as e:  # noqa: BLE001
+        JOBS[run_id].update(status="error", error=str(e)[:500], finished=_now())
+
+
 @app.post("/run")
-def run(scenario: str = "normal", push: bool = True):
+def run(background: BackgroundTasks, scenario: str = "normal", push: bool = True, wait: bool = True,
+        sim: str = "alpine"):
+    """wait=true (default): simulate (and push) now and return the summary. wait=false: queue it as a
+    background job and poll /jobs. sim=basic uses the first-build sim (thermal_basic.py)."""
+    if not wait or sim == "basic":
+        run_id = f"{scenario}-{uuid.uuid4().hex[:6]}"
+        JOBS[run_id] = {"run_id": run_id, "scenario": scenario, "sim": sim, "status": "queued", "started": _now()}
+        background.add_task(_run_job, run_id, scenario, push, sim)
+        return {"run_id": run_id, "status": "queued"}
     import thermal
-    result = thermal.run(scenario=scenario, push=push)
-    return {"run_id": result["run_id"], "events": result["n_events"], "summary": result["summary"]}
+    result = thermal.run(scenario=scenario, push=push, save=True)
+    return {"run_id": result["run_id"], "events": result["n_events"], "sent": result["n_sent"],
+            "summary": result["summary"]}
+
+
+@app.get("/jobs")
+def jobs():
+    return {"jobs": list(JOBS.values())}
 
 
 @app.get("/report")
-def report():
-    """Three metrics, each the result of one Keewano query. Falls back to the last local run."""
+def report(run_id: str | None = None):
+    """Three metrics, each the result of one Keewano query. Falls back to the last live result for the
+    run, then to the last local run."""
     try:
         import agent
-        return agent.report()
-    except Exception as e:  # noqa: BLE001 - stub path until Keewano is wired
+        live = agent.report(run_id)
+        with _lock:
+            _report_cache[live["run_id"]] = live
+            REPORT_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+            REPORT_CACHE_PATH.write_text(json.dumps(_report_cache, indent=1, default=str))
+        return live
+    except Exception as e:  # noqa: BLE001 - Keewano slow/unreachable: cached, then local
+        key = run_id
+        if key is None:
+            try:
+                import agent
+                key = agent.latest_run("normal")
+            except Exception:  # noqa: BLE001
+                key = None
+        if key and key in _report_cache:
+            return {**_report_cache[key], "cached": True, "error": str(e)[:300]}
         run = _latest_run()
         if run is None:
             raise HTTPException(503, f"no run yet and Keewano not reachable: {e}")
@@ -104,17 +178,30 @@ def report():
 def ask(body: Ask):
     try:
         import agent
-        return agent.ask(body.question)
+        return agent.ask(body.question, run_id=body.run_id)
     except Exception as e:  # noqa: BLE001
         raise HTTPException(503, f"ask not available yet: {e}")
 
 
 @app.get("/decisions")
-def decisions():
+def decisions(run_id: str | None = None):
+    """{"decisions": [{day, question, answer, decision, changed}]} for the page, plus "detail": the full
+    log (every query string and answer) for the agent run (latest if run_id is not given)."""
     p = OUT / "decisions.json"
-    if not p.exists():
-        return {"decisions": []}
-    return {"decisions": json.loads(p.read_text())}
+    flat = json.loads(p.read_text()) if p.exists() else []
+    if run_id:
+        dp = RUNS_DIR / f"decisions_{run_id}.json"
+    else:
+        files = sorted(RUNS_DIR.glob("decisions_*.json"), key=lambda f: f.stat().st_mtime)
+        dp = files[-1] if files else None
+    detail = json.loads(dp.read_text()) if dp and dp.exists() else None
+    if detail and (run_id or not flat):  # page shape from the detailed log
+        flat = [{"day": d["day"], "question": " / ".join(q["question"] for q in d.get("questions", [])),
+                 "answer": ", ".join(f"{q['answer']:,.0f}" if isinstance(q.get("answer"), (int, float))
+                                     else str(q.get("answer")) for q in d.get("questions", [])),
+                 "decision": d.get("reason", ""), "changed": d.get("changed", False)}
+                for d in detail.get("days", []) if d.get("day", 0) > 0]
+    return {"decisions": flat, "run_id": detail.get("agent_run_id") if detail else None, "detail": detail}
 
 
 def _runs() -> list[dict]:
@@ -128,8 +215,14 @@ def _runs() -> list[dict]:
 
 @app.get("/runs")
 def runs():
-    """Every local run, newest last. The page uses the latest per scenario."""
-    return {"runs": _runs()}
+    """Every local run, newest last. The page uses the latest per scenario.
+    "keewano_runs": the runs that were pushed to Keewano (outputs/runs/index.json)."""
+    try:
+        import agent
+        kw = agent.load_index()
+    except Exception:  # noqa: BLE001
+        kw = []
+    return {"runs": _runs(), "keewano_runs": kw}
 
 
 @app.get("/events")
@@ -198,4 +291,5 @@ def sensitivity(scenario: str = "normal"):
 
 @app.get("/health")
 def health():
-    return {"ok": True, "time": datetime.now(timezone.utc).isoformat()}
+    return {"ok": True, "time": datetime.now(timezone.utc).isoformat(),
+            "env": {k: bool(os.getenv(k)) for k in ENV_VARS}}

@@ -1,6 +1,6 @@
 PY ?= python3
 
-.PHONY: setup runs demo test
+.PHONY: setup runs demo test ingest agent
 
 setup:
 	uv venv --python 3.11 && .venv/bin/pip install -r requirements.txt
@@ -14,3 +14,10 @@ demo: runs
 
 test:
 	$(PY) -m pytest -q
+
+# Keewano: ingest all four scenarios, then the daily agent on the latest normal run
+ingest:
+	$(PY) thermal.py --scenario all --push
+
+agent:
+	$(PY) agent.py

@@ -1,0 +1,57 @@
+# Lansing data center, retyped by hand from HeatOS engine/sites/lansing.yaml.
+# Each value keeps its source note. "assumption - verify" means: say so on the slide.
+site:
+  id: lansing
+  name: TeraWulf Lake Hawkeye, Lansing NY (former Milliken/Cayuga coal plant)
+  capacity_mw_th: 100.0          # team supply model: phase 1, AI-inference utilization
+  supply_temp_c: 55.0            # liquid cooling supply 45-65 C (midpoint used as heat pump source)
+
+cooling:
+  chiller_cop: 5.0               # challenge spec
+  water_gal_per_kwh: 2.0         # challenge spec: cooling tower water per kWh of cooling electricity
+  dry_capacity_mw: 40.0          # dry cooler bank nameplate; assumption - verify
+  dry_derate_start_c: 20.0       # dry coolers lose capacity above this ambient; assumption - verify
+  dry_derate_span_c: 30.0        # capacity falls linearly to dry_derate_floor over this span
+  dry_derate_floor: 0.3
+  dry_boost_power_mult: 1.6      # boosted (overdriven) dry capacity costs 1.6x fan power; assumption - verify
+  misc_overhead: 0.03            # lighting, UPS losses etc. as share of IT; assumption - verify
+
+heat_pumps:
+  eta: 0.6                       # Carnot fraction; challenge spec
+  network_temp_cold_c: 70.0      # network supply temp at outdoor -15 C (weather compensated)
+  network_temp_warm_c: 55.0      # network supply temp at outdoor >= 15 C
+  direct_use_margin_c: 5.0       # challenge spec: direct if network temp <= source - 5 C
+  max_cop: 8.0
+
+storage:
+  capacity_mwh: 2800.0           # ~60,000 m3 pit at 40 K delta-T; assumption - verify
+  max_charge_mw: 10.0            # assumption - verify
+  max_discharge_mw: 10.0         # assumption - verify
+  loss_per_hour: 0.0001          # 0.01%/h; assumption - verify
+  min_soc: 0.05                  # assumption - verify
+  initial_soc: 0.5               # assumption - verify
+
+pumping:
+  design_power_kw: 250.0         # assumption - verify
+  design_flow_mw: 20.0           # 860 m3/h = 20 MW at 20 K delta-T
+  pipe_loss_per_km: 0.01         # challenge spec default 1%/km
+  network_length_km: 5.0         # demand model radius bucket <= 15 km; average path assumption
+
+prices:
+  electricity_usd_per_mwh: 110.0 # challenge spec (upstate), range 90-130
+  heat_sale_usd_per_mwh: 40.0    # priced at avoided gas boiler; assumption - verify
+
+emissions:
+  grid_t_per_mwh: 0.12           # upstate NY grid, range 0.08-0.2; assumption - verify
+  gas_boiler_t_per_mwh: 0.181    # challenge spec
+  gas_boiler_eff: 0.85           # challenge spec
+
+scenarios:
+  heat_wave:   {month: 7, start_day_of_month: 15, hours: 120, demand_mult: 0.3, ambient_add_c: 10.0}
+  cold_snap:   {month: 1, start_day_of_month: 20, hours: 72,  demand_mult: 1.4}
+  server_outage: {month: 4, start_day_of_month: 10, hours: 6, available_mult: 0.0}
+
+policy_defaults:
+  dry_boost: 0.0                 # 0..0.3 extra dry capacity (overdrive fans) -> less tower water, more power
+  discharge_floor: 0.05          # pit SOC below which we stop discharging (storage reserve)
+  precharge: false               # if true, charge the pit before exporting when SOC < 0.5

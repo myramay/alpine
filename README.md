@@ -37,3 +37,29 @@ pytest -q
 ```
 
 Or `make demo`, which runs all four scenarios and starts the API. The API serves the page at `/`, so one deployment (Railway: `Procfile` and `railway.json` are included) is the whole app; on first start with no `out/` it simulates the four scenarios itself.
+
+## Keewano: live ingest, agent and /ask
+
+```bash
+python keewano.py check                      # which keys are set (never prints them); tries ingest, MCP, SQL
+python keewano.py ping                       # one event round trip
+python thermal.py --scenario all --push      # all four scenarios into Keewano (~90 s each)
+# Keewano makes new events queryable in about 5 minutes
+python keewano.py report <run_id>            # PUE / WUE / ERF as live Keewano queries
+python agent.py --run <normal_run_id>        # daily agent: Keewano answers -> policy -> "agent" run, pushed
+python agent.py --ask "How much water did the heat wave use?"
+```
+
+| Path | What |
+| --- | --- |
+| `schema.py` | The Keewano event catalog. Keewano has no float type, so values are integers in kW, kWh, gal, kg, and cents. |
+| `keewano.py` | REST batch ingest (retry, batch-size backoff), SQL over the Postgres wire, MCP client, report queries. Also the scaffold `send()` / `query()` interface. |
+| `agent.py` | Daily agent (`decide()` rules on three Keewano answers per day), `ask()` (Claude + Keewano MCP tools + direct SQL), `report()`. |
+| `thermal_basic.py` | The first-build sim (dry-boost / precharge policy), kept with its config (`config/site_basic.yaml`), data (`data/*_basic.csv`) and tests. `agent.py --sim basic` and `POST /run?sim=basic` use it. |
+| `outputs/runs/` | Runs pushed to Keewano: `index.json`, hourly CSV in Keewano units, `decisions_<agent_run>.json` (every query and answer). |
+
+How the Keewano data is shaped: one Keewano entity per run, `uuid5("lansing:<run_id>")`. Columns are step functions, so `run_id`, `scenario`, `day`, `month`, `hour` and `decision` hold until they next change. That means `WHERE run_id = '<id>' AND month = 1` scopes every measure to January of that run.
+
+Keewano takes about 5 minutes to make new events queryable. So the daily agent reads each day of the ingested baseline run from Keewano (three SQL queries grouped by day), applies `decide()` to day d-1 to set day d's policy, then re-runs the year as the `agent` run and pushes it. It never queries its own run hour by hour.
+
+API additions: `GET /report?run_id=` (live from Keewano, then the last live result, then local), `POST /ask {question, run_id?}`, `GET /decisions?run_id=` (adds the full log as `detail`), `GET /runs` (adds `keewano_runs`), `POST /run?wait=false` plus `GET /jobs` for background runs, and `GET /health` (adds which env vars are set).
