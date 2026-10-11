@@ -52,6 +52,16 @@
   .legend { display:flex; gap:16px; flex-wrap:wrap; font-size:13px; color:var(--muted); margin-top:8px; }
   .legend i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:6px; vertical-align:-1px; }
   .pos { color:var(--bad); } .neg { color:var(--good); }
+  .scene-wrap { position:relative; border:1px solid var(--line); border-radius:12px; overflow:hidden; background:#0b0d12; }
+  #scene { width:100%; height:520px; display:block; }
+  .hud { position:absolute; left:16px; right:16px; bottom:14px; display:flex; flex-direction:column; gap:8px; pointer-events:none; }
+  .hud-row { display:flex; gap:12px; align-items:center; pointer-events:auto; }
+  .hud-row input[type=range] { flex:1; accent-color:var(--accent); }
+  .hud-row span { font-family:var(--mono); font-size:13px; color:var(--ink); min-width:56px; }
+  .hud-stats { display:flex; gap:18px; flex-wrap:wrap; font-size:13px; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .hud-stats b { color:var(--ink); font-weight:600; }
+  .keys { position:absolute; top:12px; left:16px; display:flex; gap:14px; flex-wrap:wrap; font-size:12.5px; color:var(--muted); }
+  .keys i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:6px; vertical-align:-1px; }
 </style>
 </head>
 <body>
@@ -64,13 +74,31 @@
   </div>
 </header>
 <nav>
-  <button class="on" data-tab="report">Report</button>
+  <button class="on" data-tab="site">Site</button>
+  <button data-tab="report">Report</button>
   <button data-tab="ask">Ask</button>
   <button data-tab="decisions">Decisions</button>
   <button data-tab="model">Model</button>
 </nav>
 <main>
-  <section id="report" class="on">
+  <section id="site" class="on">
+    <div class="scene-wrap">
+      <canvas id="scene"></canvas>
+      <div class="hud">
+        <div class="hud-row"><button class="go" id="play">Play</button><input type="range" id="day" min="0" max="364" value="0"><span id="day-label">Jan 1</span></div>
+        <div class="hud-stats" id="hud-stats"></div>
+      </div>
+      <div class="keys">
+        <span><i style="background:var(--sell)"></i>heat to the network</span>
+        <span><i style="background:var(--store)"></i>pit storage</span>
+        <span><i style="background:var(--dry)"></i>dry coolers</span>
+        <span><i style="background:var(--tower)"></i>towers (plume = water)</span>
+      </div>
+    </div>
+    <div class="status" id="site-status">Loading the year…</div>
+  </section>
+
+  <section id="report">
     <div class="metrics" id="metrics"></div>
     <div class="status" id="report-status">Loading…</div>
 
@@ -117,6 +145,8 @@
   </section>
 </main>
 
+<script type="importmap">{"imports":{"three":"./vendor/three.module.min.js"}}</script>
+<script type="module" src="site.js"></script>
 <script>
 const API_BASE = (new URLSearchParams(location.search).get('api')) || window.API_BASE || (location.protocol.startsWith('http') ? location.origin : 'http://localhost:8000');
 document.getElementById('api-label').textContent = API_BASE.replace(/^https?:\/\//, '');
@@ -189,6 +219,7 @@ async function loadDaily(run_id) {
   try {
     const d = await get(`/events?run_id=${encodeURIComponent(run_id)}&daily=1`);
     drawDaily(svg, d.rows);
+    window.dispatchEvent(new CustomEvent('alpine:daily', { detail: { rows: d.rows, run: RUNS.current } }));
     const peak = d.rows.reduce((a, r) => r.water_gal > a.water_gal ? r : a, d.rows[0]);
     st.textContent = `${d.rows.length} days, ${(d.rows.length * 24).toLocaleString()} simulated hours · peak water day ${peak.day} at ${Math.round(peak.water_gal).toLocaleString()} gal`;
   } catch (e) { st.innerHTML = `<span class="err">${esc(e.message)}</span>`; }

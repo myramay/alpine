@@ -15,7 +15,7 @@ def test_inputs_load_full_year():
 
 @pytest.fixture(scope="module")
 def normal_run():
-    return thermal.run(scenario="normal", push=False)
+    return thermal.run(scenario="normal", push=False, save=False)
 
 
 def test_energy_balance(normal_run):
@@ -38,7 +38,7 @@ def test_summary_is_sane(normal_run):
 
 
 def test_server_outage_zeroes_supply():
-    r = thermal.run(scenario="server_outage", push=False)
+    r = thermal.run(scenario="server_outage", push=False, save=False)
     sc = thermal.CFG["scenarios"]["server_outage"]
     hrs = {e["tags"]["hour"] for e in r["events"] if e["name"] == "heat_available_mw" and e["value"] == 0}
     assert set(range(sc["start_hour"], sc["start_hour"] + sc["hours"])) <= hrs
