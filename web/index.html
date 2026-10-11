@@ -102,6 +102,23 @@
   .kv .v small { font:11px var(--mono); color:var(--dim); margin-left:4px; }
   .bar { height:4px; background:var(--line); margin-top:6px; overflow:hidden; }
   .bar i { display:block; height:100%; background:var(--accent); width:0; transition:width .25s; }
+  .intro { display:flex; gap:24px; align-items:flex-end; justify-content:space-between; flex-wrap:wrap; margin:0 0 14px; }
+  .intro p { margin:0; max-width:760px; color:var(--muted); font-size:15px; line-height:1.55; }
+  .intro p b { color:var(--ink); font-weight:600; }
+  .flow { margin-bottom:12px; }
+  .flow-head { display:flex; justify-content:space-between; align-items:baseline; gap:12px; flex-wrap:wrap; }
+  .flow-head .t { font:11px var(--mono); color:var(--dim); text-transform:uppercase; letter-spacing:.16em; }
+  .flow-say { font-size:17px; line-height:1.45; margin:6px 0 12px; }
+  .flow-say b { font-weight:600; }
+  .flow-bar { display:flex; height:34px; gap:2px; }
+  .flow-bar div { position:relative; min-width:2px; transition:flex-grow .3s; display:flex; align-items:center; padding:0 10px; overflow:hidden; white-space:nowrap; font:600 12px var(--mono); color:#0b0b0d; }
+  .flow-keys { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:12px; margin-top:12px; }
+  @media (max-width: 760px) { .flow-keys { grid-template-columns:repeat(2, minmax(0,1fr)); } }
+  .flow-keys > div { border-top:2px solid var(--line2); padding-top:8px; }
+  .flow-keys .n { font:600 22px var(--sans); font-variant-numeric:tabular-nums; }
+  .flow-keys .n small { font:11px var(--mono); color:var(--dim); margin-left:4px; }
+  .flow-keys .l { font:12px var(--mono); color:var(--ink); }
+  .flow-keys .d { font-size:12.5px; color:var(--dim); margin-top:2px; }
   .sky-bar { display:flex; gap:14px; align-items:center; margin-bottom:10px; font:12px var(--mono); color:var(--muted); }
   .sky-root { --color-background:#0f0f12; --color-foreground:#fafafa; --color-border:#27272a; --color-muted-foreground:#a1a1aa; background:#0f0f12; color:#fafafa; }
   .sky-root section { border-radius:0 !important; }
@@ -125,6 +142,22 @@
 </nav>
 <main>
   <section id="site" class="on">
+    <div class="intro">
+      <p>A 100 MW data center turns almost all of its electricity into heat. <b>Alpine decides, every hour, where that heat goes</b>: sold to buildings nearby, stored in a hot-water pit for later, or thrown away by dry coolers (no water) or cooling towers (which evaporate water). Press Play to watch a year at the real site in Lansing, NY.</p>
+    </div>
+    <div class="frame flow"><span class="c"></span>
+      <div class="flow-head"><span class="t">Where the heat went · <span id="f-day">Jan 1</span></span><span class="t" id="f-total">— MW of heat</span></div>
+      <div class="flow-say" id="f-say">Loading…</div>
+      <div class="flow-bar" id="f-bar">
+        <div id="fb-sell" style="background:var(--sell)"></div><div id="fb-store" style="background:var(--store)"></div><div id="fb-dry" style="background:var(--dry)"></div><div id="fb-tower" style="background:var(--tower)"></div>
+      </div>
+      <div class="flow-keys">
+        <div style="border-color:var(--sell)"><div class="l">Sold to buildings</div><div class="n" id="fk-sell">—<small>MW</small></div><div class="d">Pipes to homes and businesses that buy heat instead of burning gas. Money in.</div></div>
+        <div style="border-color:var(--store)"><div class="l" id="fk-store-l">Stored in the pit</div><div class="n" id="fk-store">—<small>MW</small></div><div class="d">A big insulated hot-water pit. Fills when nobody needs heat, empties on cold nights.</div></div>
+        <div style="border-color:var(--dry)"><div class="l">Dry coolers</div><div class="n" id="fk-dry">—<small>MW</small></div><div class="d">Big fans on the roof. Throw heat away using electricity, no water.</div></div>
+        <div style="border-color:var(--tower)"><div class="l">Cooling towers</div><div class="n" id="fk-tower">—<small>MW</small></div><div class="d">Throw heat away by evaporating water. Cheap on power, costs water.</div></div>
+      </div>
+    </div>
     <div class="bento">
       <div class="scene-wrap">
         <canvas id="scene"></canvas>
@@ -134,10 +167,9 @@
         </div>
         <div class="cams"><button data-cam="overview" class="on">Overview</button><button data-cam="network">Network</button><button data-cam="towers">Towers</button><button data-cam="pit">Pit</button></div>
         <div class="keys">
-          <span><i style="background:var(--sell)"></i>to network</span>
-          <span><i style="background:var(--store)"></i>pit</span>
-          <span><i style="background:var(--dry)"></i>dry</span>
-          <span><i style="background:var(--tower)"></i>towers · plume = water</span>
+          <span><i style="background:var(--sell)"></i>green = buying heat today</span>
+          <span><i style="background:var(--store)"></i>pit level</span>
+          <span><i style="background:var(--tower)"></i>towers · steam = water</span>
         </div>
       </div>
       <div class="side" id="side">
@@ -145,17 +177,11 @@
           <div class="metric"><div class="name">Today</div><div class="value" id="s-day">—</div><div class="unit" id="s-scen">normal</div></div>
         </div>
         <div class="frame"><span class="c"></span>
-          <div class="kv"><span class="k">heat captured</span><span class="v" id="s-heat">—<small>MW</small></span></div>
-          <div class="kv"><span class="k">to network</span><span class="v" id="s-sell">—<small>MW</small></span></div>
-          <div class="kv"><span class="k">dry coolers</span><span class="v" id="s-dry">—<small>MW</small></span></div>
-          <div class="kv"><span class="k">towers</span><span class="v" id="s-tower">—<small>MW</small></span></div>
-        </div>
-        <div class="frame"><span class="c"></span>
           <div class="kv"><span class="k">water today</span><span class="v" id="s-water">—<small>gal</small></span></div>
           <div class="bar"><i id="s-water-bar"></i></div>
           <div class="kv" style="margin-top:8px"><span class="k">pit level</span><span class="v" id="s-pit">—<small>%</small></span></div>
           <div class="bar"><i id="s-pit-bar" style="background:var(--store)"></i></div>
-          <div class="kv" style="margin-top:8px"><span class="k">net cost</span><span class="v" id="s-cost">—<small>/day</small></span></div>
+          <div class="kv" style="margin-top:8px"><span class="k">running cost</span><span class="v" id="s-cost">—<small>/day</small></span></div>
         </div>
       </div>
     </div>
@@ -415,8 +441,30 @@ window.addEventListener('alpine:day', e => {
   document.getElementById('side').querySelector('.frame').classList.toggle('hot', r.scenario !== 'normal');
   set('s-heat', (r.heat_available_mw / 24).toFixed(0)); set('s-sell', (r.heat_exported_mw / 24).toFixed(0)); set('s-dry', (r.dry_mw / 24).toFixed(0)); set('s-tower', (r.heat_tower_mw / 24).toFixed(0));
   set('s-water', Math.round(r.water_gal).toLocaleString()); set('s-pit', Math.round(r.storage_soc * 100)); set('s-cost', '$' + Math.round(r.cost_usd / 1000) + 'k');
+  flow(r, e.detail.label);
   document.getElementById('s-water-bar').style.width = (100 * r.water_gal / m.water) + '%'; document.getElementById('s-pit-bar').style.width = (100 * r.storage_soc) + '%';
 });
+// "Where the heat went": the day's heat split four ways, in MW (daily MWh / 24), plus one plain sentence.
+function flow(r, label) {
+  const sell = r.heat_exported_mw / 24, st = r.heat_stored_mw / 24, dry = r.dry_mw / 24, tw = r.heat_tower_mw / 24;
+  const parts = { sell, store: Math.max(0, st), dry, tower: tw }, tot = Object.values(parts).reduce((a, b) => a + b, 0) || 1;
+  const pct = v => Math.round(100 * v / tot);
+  for (const [k, v] of Object.entries(parts)) { const el = document.getElementById('fb-' + k); el.style.flexGrow = Math.max(0.001, v); el.textContent = pct(v) >= 7 ? pct(v) + '%' : ''; }
+  const one = (id, v) => { document.getElementById(id).firstChild.textContent = Math.abs(v).toFixed(0); };
+  one('fk-sell', sell); one('fk-dry', dry); one('fk-tower', tw); one('fk-store', st);
+  document.getElementById('fk-store-l').textContent = st < -0.5 ? 'Taken from the pit' : 'Stored in the pit';
+  document.getElementById('f-day').textContent = label;
+  document.getElementById('f-total').textContent = Math.round(tot) + ' MW of heat';
+  const gal = Math.round(r.water_gal).toLocaleString(), month = new Date(2023, 0, 1 + r.day).getMonth();
+  const cold = month <= 2 || month >= 10, say = [];
+  if (r.scenario !== 'normal') say.push(`<b style="color:var(--accent)">${r.scenario.replace('_', ' ')}.</b>`);
+  if (pct(sell) >= 25) say.push(`${cold ? 'Cold day: ' : ''}buildings bought <b style="color:var(--sell)">${pct(sell)}%</b> of the heat.`);
+  else say.push(`${cold ? '' : 'Warm day: '}almost nobody needs heat, so only <b style="color:var(--sell)">${pct(sell)}%</b> was sold.`);
+  if (st > 0.5) say.push(`<b style="color:var(--store)">${st.toFixed(0)} MW</b> went into the pit for later.`);
+  else if (st < -0.5) say.push(`The pit gave back <b style="color:var(--store)">${(-st).toFixed(0)} MW</b> to cover demand.`);
+  say.push(`The rest was thrown away, and the towers evaporated <b style="color:var(--tower)">${gal} gallons</b> of water.`);
+  document.getElementById('f-say').innerHTML = say.join(' ');
+}
 // Minimal, safe markdown for answers: escape first, then **bold**, `code`, and line breaks.
 function md(s) { return esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\n/g, '<br>'); }
 function fmt(v) { if (v == null) return '—'; if (Math.abs(v) >= 1000) return Math.round(v).toLocaleString(); if (Math.abs(v) >= 100) return v.toFixed(0); if (Math.abs(v) >= 10) return v.toFixed(1); return (Math.round(v * 1000) / 1000).toString(); }

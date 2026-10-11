@@ -11,6 +11,7 @@ import threading
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 
 from dotenv import load_dotenv
 from fastapi import BackgroundTasks, FastAPI, HTTPException
@@ -123,7 +124,7 @@ def index():
 
 class Ask(BaseModel):
     question: str
-    run_id: str | None = None
+    run_id: Optional[str] = None  # Optional, not "str | None": pydantic evaluates it, and Python 3.9 cannot
 
 
 def _latest_run() -> dict | None:
@@ -219,7 +220,11 @@ def ask(body: Ask):
         import agent
         return agent.ask(body.question, run_id=body.run_id)
     except Exception as e:  # noqa: BLE001
-        raise HTTPException(503, f"ask not available yet: {e}")
+        detail = str(e)
+        subs = getattr(e, "exceptions", None)   # ExceptionGroup from the MCP client: show the real cause
+        if subs:
+            detail += " :: " + "; ".join(f"{type(s).__name__}: {str(s)[:200]}" for s in subs)
+        raise HTTPException(503, f"ask failed: {detail}")
 
 
 @app.get("/decisions")

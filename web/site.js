@@ -95,7 +95,7 @@ async function init() {
   const labelLayer = document.createElement('div'); labelLayer.className = 'labels'; wrap.appendChild(labelLayer);
   const mkLabel = (text, pos, cls = '') => { const el = document.createElement('div'); el.className = 'lbl ' + cls; el.textContent = text; labelLayer.appendChild(el); return { el, pos }; };
   const lk = W(-1200, 1800);
-  const labels = [mkLabel('data center · 100 MW IT · former coal plant', new THREE.Vector3(0, 4.6, 0)), mkLabel('cooling towers', new THREE.Vector3(17, 1.0, 7)), mkLabel('pit storage · 2,800 MWh', new THREE.Vector3(-11, 1.4, 7)), mkLabel('Cayuga Lake', new THREE.Vector3(lk[0], 0.6, lk[1]))];
+  const labels = [mkLabel('data center · 100 MW', new THREE.Vector3(-4, 6.5, -2)), mkLabel('dry coolers', new THREE.Vector3(-6, 4.4, -2.6), 'small'), mkLabel('cooling towers', new THREE.Vector3(15, -1.5, 6)), mkLabel('heat storage pit', new THREE.Vector3(-11, 1.4, 7)), mkLabel('heat pipes to buildings →', new THREE.Vector3(9, 1.2, -30), 'small'), mkLabel('Cayuga Lake', new THREE.Vector3(lk[0], 0.6, lk[1]))];
   cands.slice(0, 5).forEach(c => { const [x, z] = W(c.x, c.y); labels.push(mkLabel(c.name, new THREE.Vector3(x, (c.h || 8) * S * HX + 1, z), 'small')); });
   const scenarioLbl = mkLabel('', new THREE.Vector3(0, 8, 0), 'scen'); scenarioLbl.el.style.display = 'none';
   const tipEl = document.createElement('div'); tipEl.className = 'lbl tip3d'; tipEl.style.display = 'none'; labelLayer.appendChild(tipEl);
