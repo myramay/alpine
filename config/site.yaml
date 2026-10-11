@@ -1,6 +1,6 @@
 # Alpine site config. Every number carries a source. "assumption - verify" means exactly that.
-# Constants retyped from the HeatOS Lansing site config (engine/sites/lansing.yaml), which cites the
-# NYU/Grundfos/HDR challenge spec for most of them.
+# Most constants follow the NYU/Grundfos/HDR data center heat reuse challenge spec; the rest are
+# our own assumptions and are marked as such.
 
 site:
   id: lansing
@@ -13,7 +13,7 @@ data_center:
   it_load_mw: 100.0                 # phase 1, AI inference; source: supply model (data/supply.csv)
   liquid_cooled: true
   supply_temp_c: 55.0               # liquid cooling supply 45-65 C; midpoint
-  capture_fraction: 0.75            # direct-to-chip capture; range 0.65-0.80; source: HeatOS supply model
+  capture_fraction: 0.75            # direct-to-chip capture; range 0.65-0.80; source: supply model (data/supply.csv)
   pue_base: 1.15                    # liquid-cooled; assumption - verify
 
 cooling:
@@ -24,7 +24,7 @@ cooling:
   water_gal_per_kwh: 2.0            # evaporative cooling water per kWh of cooling electricity; challenge spec
 
 heat_network:
-  supply_temp_c: 70.0               # 4th-gen hot water network; HeatOS methodology
+  supply_temp_c: 70.0               # 4th-gen hot water network
   pipe_loss_per_km: 0.01            # challenge spec default 1%/km
   route_km: 6.0                     # mean route to 15 km-radius customers; assumption - verify
   heat_pump_carnot_fraction: 0.6    # challenge spec

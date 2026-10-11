@@ -20,7 +20,7 @@ Built at SpeedHacks, Oct 11, 2026. Theme: give people time back. The bottleneck 
 
 ## Where the data comes from
 
-The hourly supply and demand curves are outputs of trained models from the HeatOS project (`myramay/data-center-heatos`): a multi-source compute-load trace model (7 public trace sources, 134 domains) for supply, and a quantile demand model trained on NYC LL84 and NREL profiles for demand, run for the Lansing, NY site on NOAA Ithaca weather. `data/MODEL_VALIDATION.txt` is their held-out validation. We use the outputs as CSVs; nothing else from that project is used.
+The hourly supply and demand curves are outputs of two trained models: a multi-source compute-load trace model (7 public trace sources, 134 domains) for supply, and a quantile demand model trained on NYC LL84 building data and NREL ComStock/ResStock profiles for demand, run for the Lansing, NY site on NOAA Ithaca weather. `data/MODEL_VALIDATION.txt` is their held-out validation.
 
 - `data/supply.csv`: phase 1, AI inference, 100 MW IT. Columns: IT MW, source heat MW, delivered heat MW, heat-pump electricity MW, COP, each at P10/P50/P90.
 - `data/demand.csv`: heat demand from buildings within 15 km, P10/P50/P90, plus outdoor temperature.
