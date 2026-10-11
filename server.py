@@ -235,8 +235,14 @@ def decisions(run_id: str | None = None):
     if run_id:
         dp = RUNS_DIR / f"decisions_{run_id}.json"
     else:
-        files = sorted(RUNS_DIR.glob("decisions_*.json"), key=lambda f: f.stat().st_mtime)
-        dp = files[-1] if files else None
+        import agent
+        # Newest Alpine-sim agent run by index.json "created" (file mtimes are meaningless after a
+        # git checkout on Railway, which made the page pick the old thermal_basic run).
+        latest = agent.latest_run(scenario="agent", sim="alpine") or agent.latest_run(scenario="agent")
+        dp = RUNS_DIR / f"decisions_{latest}.json" if latest else None
+        if not (dp and dp.exists()):
+            files = sorted(RUNS_DIR.glob("decisions_*.json"), key=lambda f: f.stat().st_mtime)
+            dp = files[-1] if files else None
     detail = json.loads(dp.read_text()) if dp and dp.exists() else None
     if detail and (run_id or not flat):  # page shape from the detailed log
         flat = [{"day": d["day"], "question": " / ".join(q["question"] for q in d.get("questions", [])),
