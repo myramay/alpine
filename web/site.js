@@ -138,7 +138,7 @@ function init() {
 
   function makeLabel(text, color = '#e8eaf0') {
     const c = document.createElement('canvas'), ctx = c.getContext('2d'); c.width = 512; c.height = 96;
-    ctx.font = '600 34px system-ui, sans-serif'; ctx.fillStyle = color; ctx.textAlign = 'center'; ctx.fillText(text, 256, 60);
+    ctx.font = '600 34px "Faculty Glyphic", system-ui, sans-serif'; ctx.fillStyle = color; ctx.textAlign = 'center'; ctx.fillText(text, 256, 60);
     const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthTest: false }));
     s.scale.set(16, 3, 1); return s;
   }

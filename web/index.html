@@ -4,12 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Alpine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Faculty+Glyphic&display=swap" rel="stylesheet">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Cpath d=%27M4 26 L16 6 L28 26 Z%27 fill=%27%23f2a93b%27/%3E%3C/svg%3E">
 <style>
   :root { --bg:#09090b; --panel:#0f0f12; --panel2:#131317; --line:#27272a; --line2:#3f3f46; --ink:#fafafa; --muted:#a1a1aa; --dim:#71717a;
           --accent:#f2a93b; --good:#34d399; --bad:#f87171;
           --sell:#34d399; --store:#60a5fa; --dry:#a1a1aa; --tower:#f87171; --water:#22d3ee;
-          --mono: ui-monospace, "JetBrains Mono", SFMono-Regular, Menlo, monospace; --sans: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; }
+          --mono: "Faculty Glyphic", ui-monospace, SFMono-Regular, Menlo, monospace; --sans: "Faculty Glyphic", system-ui, -apple-system, "Segoe UI", sans-serif; --code: ui-monospace, SFMono-Regular, Menlo, monospace; }
   * { box-sizing:border-box; }
   html { background:var(--bg); }
   body { margin:0; color:var(--ink); font:15px/1.5 var(--sans); background:
@@ -41,7 +43,7 @@
   .metric .value { font-size:44px; font-weight:600; letter-spacing:-.02em; margin:4px 0 0; font-variant-numeric:tabular-nums; line-height:1.1; }
   .metric .unit { font:11px var(--mono); color:var(--dim); margin-top:2px; }
   .metric .meaning { margin-top:12px; font-size:13px; color:var(--muted); }
-  .query { margin-top:12px; font:11.5px/1.5 var(--mono); color:var(--dim); background:var(--bg); border:1px solid var(--line); padding:10px; white-space:pre-wrap; word-break:break-word; }
+  .query { margin-top:12px; font:11.5px/1.5 var(--code); color:var(--dim); background:var(--bg); border:1px solid var(--line); padding:10px; white-space:pre-wrap; word-break:break-word; }
   form { display:flex; gap:10px; }
   input[type=text] { flex:1; background:var(--panel); border:1px solid var(--line2); color:var(--ink); padding:12px 14px; font:15px var(--sans); }
   input[type=text]:focus { outline:none; border-color:var(--accent); }
@@ -55,7 +57,7 @@
   th, td { text-align:left; padding:9px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
   th { font:11px var(--mono); color:var(--dim); text-transform:uppercase; letter-spacing:.14em; font-weight:500; }
   td.n, th.n { text-align:right; font-variant-numeric:tabular-nums; font-family:var(--mono); font-size:12.5px; }
-  td.q { font-family:var(--mono); font-size:12px; color:var(--dim); }
+  td.q { font-family:var(--code); font-size:12px; color:var(--dim); }
   .pill { display:inline-block; padding:2px 8px; font:11px var(--mono); border:1px solid var(--line2); text-transform:uppercase; letter-spacing:.08em; }
   .pill.good { color:var(--good); border-color:var(--good); }
   .status { color:var(--dim); font:12px var(--mono); margin-top:10px; }

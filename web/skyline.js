@@ -77,11 +77,11 @@
     const dpr = Math.min(devicePixelRatio, 2), W = canvas.clientWidth, H = canvas.clientHeight;
     if (canvas.width !== W * dpr) { canvas.width = W * dpr; canvas.height = H * dpr; }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
-    if (!rows.length) { ctx.fillStyle = '#71717a'; ctx.font = '12px ui-monospace, monospace'; ctx.fillText('waiting for the year…', 40, 60); requestAnimationFrame(frame); return; }
+    if (!rows.length) { ctx.fillStyle = '#71717a'; ctx.font = '12px "Faculty Glyphic", ui-monospace, monospace'; ctx.fillText('waiting for the year…', 40, 60); requestAnimationFrame(frame); return; }
     const vals = rows.map(val); maxV = Math.max(1e-9, ...vals); minV = Math.min(...vals);
     const norm = v => v <= 0 ? 0 : (maxV - minV < 1e-9 ? 1 : 0.12 + 0.88 * (v - minV) / (maxV - minV));
     const maxH = 95 * k3;
-    ctx.fillStyle = '#71717a'; ctx.font = '11px ui-monospace, monospace';
+    ctx.fillStyle = '#71717a'; ctx.font = '11px "Faculty Glyphic", ui-monospace, monospace';
     for (let m = 0; m < 12; m++) { const d0 = Math.round((Date.UTC(year, m, 1) - Date.UTC(year, 0, 1)) / 864e5), w = Math.floor((d0 + startDow) / 7); const t = topFace(w, 0, 0); ctx.fillText(['J','F','M','A','M','J','J','A','S','O','N','D'][m], t[0][0], t[0][1] - 8 - 16 * k3); }
     // back-to-front: in this iso, larger (w + d) is nearer the viewer
     const order = rows.map((r, i) => i).sort((a, b) => { const wa = Math.floor((a + startDow) / 7), wb = Math.floor((b + startDow) / 7), da = (a + startDow) % 7, db = (b + startDow) % 7; return (wa + da) - (wb + db); });
