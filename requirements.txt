@@ -1,0 +1,11 @@
+numpy
+pandas
+pyyaml
+httpx
+python-dotenv
+fastapi
+uvicorn[standard]
+anthropic
+mcp
+psycopg[binary]
+pytest

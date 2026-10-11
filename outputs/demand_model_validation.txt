@@ -1,0 +1,16 @@
+Held-out 20% of days (NYC + NY state)      space  hourly R2=0.944  daily R2=0.963  MAE=0.156  P10-P90 coverage=74%
+Held-out 20% of days (NYC + NY state)      dhw    hourly R2=0.945  daily R2=0.957  MAE=0.078  P10-P90 coverage=80%
+Unseen colder climate: Tompkins ComStock   space  hourly R2=0.783  daily R2=0.820  MAE=0.508  P10-P90 coverage=46%
+Unseen colder climate: Tompkins ComStock   dhw    hourly R2=0.820  daily R2=0.673  MAE=0.198  P10-P90 coverage=52%
+Conformal widening (share of P50 added to each side): space 0.03, dhw 0.00
+Multi-source trace model: 7 sources, 134 domains, 81,624 domain-hours; workloads: dl_training, hpc, mixed_cloud, vm_iaas
+  not used for training: azure_llm (request/token counts, not power (daily swing >100%))
+  not used for training: pm100 (power summed per job, so idle nodes are missing (swings ~70%/day))
+  held out alibaba_2018     MAE 0.043 of mean load (flat guess 0.050, Google-only 0.044) | P10-P90 coverage 71% | 41 domains
+  held out alibaba_pai_2020 MAE 0.070 of mean load (flat guess 0.070, Google-only 0.070) | P10-P90 coverage 78% | 18 domains
+  held out azure_vm         MAE 0.004 of mean load (flat guess 0.004, Google-only 0.021) | P10-P90 coverage 100% | 3 domains
+  held out bitbrains        MAE 0.045 of mean load (flat guess 0.045, Google-only 0.054) | P10-P90 coverage 46% | 10 domains
+  held out google_2019      MAE 0.051 of mean load (flat guess 0.041) | P10-P90 coverage 54% | 55 domains
+  held out mit_supercloud   MAE 0.124 of mean load (flat guess 0.123, Google-only 0.122) | P10-P90 coverage 22% | 1 domains
+  held out philly           MAE 0.072 of mean load (flat guess 0.070, Google-only 0.073) | P10-P90 coverage 81% | 6 domains
+Hourly load by source: alibaba_2018: P10-P90 0.93-1.08 x mean, daily swing 22.8%; alibaba_pai_2020: P10-P90 0.89-1.12 x mean, daily swing 13.6%; azure_vm: P10-P90 0.99-1.01 x mean, daily swing 1.1%; bitbrains: P10-P90 0.88-1.10 x mean, daily swing 2.3%; google_2019: P10-P90 0.93-1.06 x mean, daily swing 11.6%; mit_supercloud: P10-P90 0.78-1.18 x mean, daily swing 12.9%; philly: P10-P90 0.90-1.11 x mean, daily swing 10.2%
