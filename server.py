@@ -68,6 +68,14 @@ def skyline_js():
     return FileResponse(WEB / "skyline.js", media_type="application/javascript")
 
 
+@app.get("/geo/{name}")
+def geo(name: str):
+    p = (WEB / "geo" / name).resolve()
+    if p.parent != (WEB / "geo").resolve() or not p.exists():
+        raise HTTPException(404)
+    return FileResponse(p, media_type="application/json")
+
+
 @app.get("/vendor/{name}")
 def vendor(name: str):
     p = (WEB / "vendor" / name).resolve()

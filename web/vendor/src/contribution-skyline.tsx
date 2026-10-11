@@ -132,8 +132,9 @@ export const buildGrid = (data: ContributionDay[], endMs: number, weekStart = 0)
   }
   const nz = cells.map((c) => c.count).filter((c) => c > 0).sort((a, b) => a - b)
   const busy = nz.length ? nz[Math.floor(0.95 * (nz.length - 1))] : 0
+  const lo = nz.length ? nz[0] : 0
   for (const c of cells) c.level = levelOf(c.count, busy)
-  return { cells, weeks: cells.length ? cells[cells.length - 1].week + 1 : 0, max: nz.length ? nz[nz.length - 1] : 0, busy }
+  return { cells, weeks: cells.length ? cells[cells.length - 1].week + 1 : 0, max: nz.length ? nz[nz.length - 1] : 0, busy, lo }
 }
 
 /** 0 for an empty day, else 1–4 by quarters of `busy`. Anything at or past `busy` is 4. */
@@ -554,6 +555,8 @@ export default function ContributionSkyline({
     let lv = new Uint8Array(0)
     let cnt = new Float32Array(0)
     let busy = 0
+    let lo = 0
+    let hi = 0
     let hgt = new Float32Array(0)
     let zs = new Float32Array(0)
     let hover = new Float32Array(0)
@@ -598,6 +601,8 @@ export default function ContributionSkyline({
       }
       months = m.months
       busy = (m as any).busy ?? m.max
+      lo = (m as any).lo ?? 0
+      hi = m.max
       const wf = new Intl.DateTimeFormat(locale, { weekday: "short", timeZone: "UTC" })
       weekdayRows = []
       for (let d = 0; d < 7 && d < n; d++) {
@@ -759,11 +764,11 @@ export default function ContributionSkyline({
         if (cnt[i] <= 0 || busy <= 0) {
           r = col[0]; g = col[1]; bl = col[2]
         } else {
-          const u = Math.min(1, cnt[i] / busy) * 3          // 0..3 across stops 1..4
-          const lo = 1 + Math.floor(u), hi = Math.min(4, lo + 1), ft = u - Math.floor(u)
-          r = col[lo * 3] + (col[hi * 3] - col[lo * 3]) * ft
-          g = col[lo * 3 + 1] + (col[hi * 3 + 1] - col[lo * 3 + 1]) * ft
-          bl = col[lo * 3 + 2] + (col[hi * 3 + 2] - col[lo * 3 + 2]) * ft
+          const u = (hi > lo ? Math.min(1, Math.max(0, (cnt[i] - lo) / (hi - lo))) : 1) * 3   // full min..max range across stops 1..4
+          const i0 = 1 + Math.floor(u), i1 = Math.min(4, i0 + 1), ft = u - Math.floor(u)
+          r = col[i0 * 3] + (col[i1 * 3] - col[i0 * 3]) * ft
+          g = col[i0 * 3 + 1] + (col[i1 * 3 + 1] - col[i0 * 3 + 1]) * ft
+          bl = col[i0 * 3 + 2] + (col[i1 * 3 + 2] - col[i0 * 3 + 2]) * ft
         }
         const d = dim[i]
         if (d > 0.002) {
