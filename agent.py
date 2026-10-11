@@ -622,9 +622,14 @@ GROUP BY hour ORDER BY x DESC LIMIT 1`.
 - Always answer from a query you ran (prefer the run_sql tool). If a query errors, read the error, \
 fix the SQL, and retry.
 - Give the number with units (convert to friendly units: gal and L, MWh, tonnes, dollars, C) in one \
-or two sentences, and say which run (run_id and scenario) it is about.
-- If the user does not name a run, use the latest normal run for single-run questions, and say so.
-- Do not invent numbers. If the data cannot answer the question, say what is missing."""
+or two sentences. Lead with the answer in bold, then one short sentence of context in plain words \
+(e.g. "for the normal year" or "during the July heat wave").
+- If the user does not name a run, use the latest normal run for single-run questions. Do not print run \
+ids, table names or SQL in the answer: the page shows the query under it.
+- Do not invent numbers. If the data cannot answer the question, say what is missing.
+- Be confident and short: at most 3 bullets after the lead sentence. If a comparison would help (is this the \
+year's peak? how does it compare with winter?), run that query and state the result. Never end with a note \
+about what you did not check or compare."""
 
 
 def _known_runs_text(run_id: str | None) -> str:

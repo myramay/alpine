@@ -33,6 +33,7 @@ export type ContributionStats = {
   busiest: { count: number; date: string | null }
   longest: Streak
   current: Streak
+  quietest: { count: number; date: string | null }
 }
 export type RGB = [number, number, number]
 
@@ -149,8 +150,14 @@ export const computeStats = (cells: Cell[]): ContributionStats => {
   let run = 0
   let runStart: string | null = null
   let longest: Streak = { days: 0, start: null, end: null }
+  let low = Infinity
+  let lowDate: string | null = null
   for (const c of cells) {
     total += c.count
+    if (c.count < low) {
+      low = c.count
+      lowDate = c.date
+    }
     if (c.count > best) {
       best = c.count
       bestDate = c.date
@@ -174,6 +181,7 @@ export const computeStats = (cells: Cell[]): ContributionStats => {
     busiest: { count: best, date: bestDate },
     longest,
     current,
+    quietest: { count: Number.isFinite(low) ? low : 0, date: lowDate },
   }
 }
 
@@ -1181,8 +1189,9 @@ export default function ContributionSkyline({
   const statBlocks = [
     { label: "1 year total", value: nf.format(stats.total), unit: noun(stats.total), sub: range(stats.first, stats.last, true) },
     { label: "Busiest day", value: nf.format(stats.busiest.count), unit: noun(stats.busiest.count), sub: stats.busiest.date ? df.format(dayMs(stats.busiest.date)) : "—" },
-    { label: "Longest streak", value: nf.format(stats.longest.days), unit: stats.longest.days === 1 ? "day" : "days", sub: range(stats.longest.start, stats.longest.end) },
-    { label: "Current streak", value: nf.format(stats.current.days), unit: stats.current.days === 1 ? "day" : "days", sub: range(stats.current.start, stats.current.end) },
+    // Alpine: streaks mean nothing for heat or water (every day is non-zero), so show the daily average and the quietest day.
+    { label: "Daily average", value: nf.format(Math.round(stats.total / Math.max(1, model.cells.length))), unit: noun(stats.total / Math.max(1, model.cells.length)), sub: range(stats.first, stats.last) },
+    { label: "Quietest day", value: nf.format(stats.quietest.count), unit: noun(stats.quietest.count), sub: stats.quietest.date ? df.format(dayMs(stats.quietest.date)) : "—" },
   ]
   const showRow = showStats && !(is3d && corners)
   const ease = "cubic-bezier(0.65, 0, 0.35, 1)"

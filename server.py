@@ -468,6 +468,19 @@ def create_site(body: SiteIn):
     return {"site_id": sid, "status": "queued"}
 
 
+@app.post("/sites/{site_id}/retry")
+def retry_site(site_id: str):
+    """Rebuild a site whose build failed (e.g. Overpass was down); cached downloads are reused."""
+    import sites
+    if not sites.ID_RE.match(site_id or ""):
+        raise HTTPException(404, "no such site")
+    try:
+        sites.retry_site(site_id)
+    except ValueError as e:
+        raise HTTPException(409, str(e)[:200])
+    return {"site_id": site_id, "status": "queued"}
+
+
 @app.get("/sites")
 def list_sites():
     """Every site, Lansing (the worked example) first: id, name, status, created, headline numbers."""
@@ -485,8 +498,19 @@ def get_site(site_id: str):
     return _site_view(meta, full=True)
 
 
+_SENS_CACHE: dict = {}
+
+
 @app.get("/sensitivity")
 def sensitivity(scenario: str = "normal", site: Optional[str] = None):
+    """Cached per (site, scenario): the inputs (config + data) don't change while the server runs, and a cold run is ~6 s."""
+    key = (_site(site), scenario)
+    if key not in _SENS_CACHE:
+        _SENS_CACHE[key] = _sensitivity(scenario, site)
+    return _SENS_CACHE[key]
+
+
+def _sensitivity(scenario: str = "normal", site: Optional[str] = None):
     """One-at-a-time +/-25% on the 'assumption - verify' constants; which ones move WUE and ERF."""
     import copy
     import thermal

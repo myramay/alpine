@@ -122,6 +122,9 @@
   .examples button:hover { background:var(--hover); color:var(--ink); }
   .answer { margin-top:24px; font-size:18px; line-height:1.55; color:var(--ink); letter-spacing:-.2px; }
   .answer:empty { display:none; }
+  .answer p { margin:0 0 8px; } .answer p + p, .answer li { font-size:15px; color:var(--muted); }
+  .answer ul { margin:4px 0 8px; padding-left:20px; } .answer li { margin:4px 0; line-height:1.5; } .answer li b { color:var(--ink); }
+  .query-label { margin-top:18px; font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
   .answer b { color:var(--ink); font-weight:600; }
   .answer code { font:.78em var(--code); color:#444; background:var(--subtle); border:1px solid var(--border); border-radius:5px; padding:1px 5px; }
 
@@ -195,6 +198,23 @@
   .today .cap { font-size:12px; color:var(--muted); }
   .today .value { font-size:34px; font-weight:500; letter-spacing:-1.1px; line-height:1.15; margin-top:4px; font-variant-numeric:tabular-nums; }
   .today .unit { margin-top:6px; }
+  /* Site: intro + where the heat went */
+  .intro { margin:0 0 14px; max-width:780px; color:var(--muted); font-size:15px; line-height:1.55; }
+  .intro b { color:var(--ink); font-weight:500; }
+  .flow { margin-bottom:14px; }
+  .flow-head { display:flex; justify-content:space-between; gap:12px; font-size:12px; color:var(--muted); }
+  .flow-say { font-size:17px; line-height:1.45; margin:6px 0 14px; letter-spacing:-.2px; }
+  .flow-say b { font-weight:600; }
+  .flow-bar { display:flex; height:30px; gap:2px; border-radius:8px; overflow:hidden; }
+  .flow-bar div { min-width:2px; transition:flex-grow .3s; display:flex; align-items:center; padding:0 10px; white-space:nowrap; overflow:hidden; font-size:12px; font-weight:600; color:#fff; }
+  .flow-keys { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:14px; margin-top:14px; }
+  @media (max-width: 760px) { .flow-keys { grid-template-columns:repeat(2, minmax(0,1fr)); } }
+  .flow-keys > div { border-top:2px solid var(--border); padding-top:8px; }
+  .flow-keys .l { font-size:13px; font-weight:500; }
+  .flow-keys .n { font-size:22px; font-weight:500; font-variant-numeric:tabular-nums; letter-spacing:-.4px; }
+  .flow-keys .n small { font-size:11px; color:var(--muted); margin-left:4px; font-weight:400; }
+  .flow-keys .d { font-size:12.5px; color:var(--muted); margin-top:2px; line-height:1.4; }
+  tr.changed td { background:#f3f8f5; }
   .card.hot { border-color:#c5d6ea; background:linear-gradient(#f7fafd, #fff); }
   .card.hot .unit .pill { background:var(--blue-fill); color:var(--blue); }
   .kv { display:flex; justify-content:space-between; align-items:baseline; padding:8px 0; border-bottom:1px solid var(--border); gap:10px; }
@@ -348,7 +368,7 @@
     <div class="tools">
       <label class="select" title="Site"><span class="muted" style="font-size:12px;margin-right:8px">Site</span><select id="site-sel" aria-label="Site" style="text-transform:none"><option>Example: Lansing, NY</option></select><svg class="i" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></label>
       <label class="select" title="Scenario"><span class="muted" style="font-size:12px;margin-right:8px">Scenario</span><select id="scenario" aria-label="Scenario"></select><svg class="i" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></label>
-      <span class="api" title="API"><span class="dot" id="dot"></span><span id="api-label">api</span></span>
+      <span class="api" title="API" hidden style="display:none"><span class="dot" id="dot"></span><span id="api-label">api</span></span>
     </div>
   </div>
 </header>
@@ -389,6 +409,20 @@
 
 <main>
   <section id="site" class="on">
+    <p class="intro">A 100 MW data center turns almost all of its electricity into heat. <b>Alpine decides, every hour, where that heat goes</b>: sold to buildings nearby, stored in a hot-water pit for later, or thrown away by dry coolers (no water) or cooling towers (which evaporate water). Press Play to watch a year at the real site in Lansing, NY.</p>
+    <div class="card flow">
+      <div class="flow-head"><span>Where the heat went · <span id="f-day">Jan 1</span></span><span id="f-total">— MW of heat</span></div>
+      <div class="flow-say" id="f-say">Loading…</div>
+      <div class="flow-bar">
+        <div id="fb-sell" style="background:var(--sell)"></div><div id="fb-store" style="background:var(--store)"></div><div id="fb-dry" style="background:var(--dry)"></div><div id="fb-tower" style="background:var(--tower)"></div>
+      </div>
+      <div class="flow-keys">
+        <div style="border-color:var(--sell)"><div class="l">Sold to buildings</div><div class="n" id="fk-sell">—<small>MW</small></div><div class="d">Piped to homes and businesses that buy it instead of burning gas.</div></div>
+        <div style="border-color:var(--store)"><div class="l" id="fk-store-l">Stored in the pit</div><div class="n" id="fk-store">—<small>MW</small></div><div class="d">An insulated hot-water pit. Fills when nobody needs heat, empties on cold nights.</div></div>
+        <div style="border-color:var(--dry)"><div class="l">Dry coolers</div><div class="n" id="fk-dry">—<small>MW</small></div><div class="d">Fans on the roof. Throw heat away with electricity, no water.</div></div>
+        <div style="border-color:var(--tower)"><div class="l">Cooling towers</div><div class="n" id="fk-tower">—<small>MW</small></div><div class="d">Throw heat away by evaporating water. Cheap on power, costs water.</div></div>
+      </div>
+    </div>
     <div class="bento">
       <div class="scene-wrap">
         <canvas id="scene"></canvas>
@@ -491,6 +525,7 @@
       </form>
       <div class="examples" id="examples"></div>
       <div class="answer" id="answer"></div>
+      <div class="query-label" id="answer-query-label" style="display:none">Keewano query behind this answer</div>
       <div class="query" id="answer-query" style="display:none"></div>
       <div class="status" id="ask-status"></div>
     </div>
@@ -693,9 +728,20 @@ async function loadDecisions() {
   if (SITE !== 'lansing') { body.innerHTML = ''; st.textContent = 'The daily agent (agent.py) has run on the Lansing example only. This site has a baseline year in Keewano; run python agent.py --run <its normal run id> to add decisions.'; return; }
   try {
     const d = await get('/decisions');
-    body.innerHTML = d.decisions.map(x => `<tr><td class="n" style="text-align:left">${x.day}</td><td class="q">${esc(x.question)}</td><td>${esc(x.answer)}</td>
-      <td><span class="pill ${x.changed ? 'good' : ''}">${esc(x.decision)}</span></td></tr>`).join('');
-    st.textContent = d.decisions.length ? `${d.decisions.length} daily decisions` : 'No decisions yet. Run agent.py.';
+    // Show the days the policy changed plus the first week; the rest (all "no change") behind a toggle.
+    const row = x => `<tr class="${x.changed ? 'changed' : ''}"><td class="n" style="text-align:left">${x.day}</td><td class="q">${esc(x.question)}</td><td>${esc(x.answer)}</td>
+      <td><span class="pill ${x.changed ? 'good' : ''}">${esc(x.decision)}</span></td></tr>`;
+    const all = d.decisions, nChanged = all.filter(x => x.changed).length;
+    const short = all.filter((x, i) => x.changed || i < 7);
+    let open = false;
+    const draw = () => {
+      body.innerHTML = (open ? all : short).map(row).join('');
+      st.innerHTML = all.length
+        ? `${all.length} days checked · policy changed on ${nChanged} ${nChanged === 1 ? 'day' : 'days'} · <a href="#" id="dec-toggle">${open ? 'show only changes' : 'show all ' + all.length + ' days'}</a>`
+        : 'No decisions yet. Run agent.py.';
+      const t = document.getElementById('dec-toggle'); if (t) t.onclick = e => { e.preventDefault(); open = !open; draw(); };
+    };
+    draw();
   } catch (e) { st.innerHTML = `<span class="err">Decisions unavailable: ${esc(e.message)}</span>`; }
 }
 
@@ -706,14 +752,14 @@ document.getElementById('ask-form').onsubmit = e => { e.preventDefault(); ask();
 async function ask() {
   const q = document.getElementById('q').value.trim(); if (!q) return;
   const go = document.getElementById('go'), ans = document.getElementById('answer'), qq = document.getElementById('answer-query'), st = document.getElementById('ask-status');
-  go.disabled = true; ans.textContent = ''; qq.style.display = 'none'; st.textContent = 'Asking Keewano…';
+  go.disabled = true; ans.textContent = ''; qq.style.display = 'none'; document.getElementById('answer-query-label').style.display = 'none'; st.textContent = 'Asking Keewano…';
   const t0 = performance.now();
   try {
     const payload = SITE === 'lansing' ? { question: q } : { question: q, site: SITE, run_id: RUNS.byScenario.normal?.run_id || null };
     const d = await get('/ask', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
-    ans.innerHTML = md(d.answer); qq.textContent = d.query; qq.style.display = 'block';
+    ans.innerHTML = answerHtml(d.answer); qq.textContent = d.query; qq.style.display = d.query ? 'block' : 'none'; document.getElementById('answer-query-label').style.display = d.query ? 'block' : 'none';
     const nrows = Array.isArray(d.rows) ? d.rows.length : d.rows;
-    st.textContent = `${((performance.now() - t0) / 1000).toFixed(1)} s${nrows != null ? ' · ' + nrows + ' rows' : ''}`;
+    st.textContent = `Answered from Keewano in ${((performance.now() - t0) / 1000).toFixed(1)} s${nrows != null ? ' · ' + nrows + (nrows === 1 ? ' row' : ' rows') : ''}`;
   } catch (e) { st.innerHTML = `<span class="err">${esc(e.message)}</span>`; }
   go.disabled = false;
 }
@@ -886,8 +932,41 @@ window.addEventListener('alpine:day', e => {
   document.getElementById('side').querySelector('.card').classList.toggle('hot', r.scenario !== 'normal');
   set('s-heat', (r.heat_available_mw / 24).toFixed(0)); set('s-sell', (r.heat_exported_mw / 24).toFixed(0)); set('s-dry', (r.dry_mw / 24).toFixed(0)); set('s-tower', (r.heat_tower_mw / 24).toFixed(0));
   set('s-water', Math.round(r.water_gal).toLocaleString()); set('s-pit', Math.round(r.storage_soc * 100)); set('s-cost', '$' + Math.round(r.cost_usd / 1000) + 'k');
+  flow(r, e.detail.label);
   document.getElementById('s-water-bar').style.width = (100 * r.water_gal / m.water) + '%'; document.getElementById('s-pit-bar').style.width = (100 * r.storage_soc) + '%';
 });
+// "Where the heat went": the day's heat split four ways, in MW (daily MWh / 24), plus one plain sentence.
+function flow(r, label) {
+  const sell = r.heat_exported_mw / 24, st = r.heat_stored_mw / 24, dry = r.dry_mw / 24, tw = r.heat_tower_mw / 24;
+  const parts = { sell, store: Math.max(0, st), dry, tower: tw }, tot = Object.values(parts).reduce((a, b) => a + b, 0) || 1;
+  const pct = v => Math.round(100 * v / tot);
+  for (const [k, v] of Object.entries(parts)) { const el = document.getElementById('fb-' + k); el.style.flexGrow = Math.max(0.001, v); el.textContent = pct(v) >= 7 ? pct(v) + '%' : ''; }
+  const one = (id, v) => { document.getElementById(id).firstChild.textContent = Math.abs(v).toFixed(0); };
+  one('fk-sell', sell); one('fk-dry', dry); one('fk-tower', tw); one('fk-store', st);
+  document.getElementById('fk-store-l').textContent = st < -0.5 ? 'Taken from the pit' : 'Stored in the pit';
+  document.getElementById('f-day').textContent = label;
+  document.getElementById('f-total').textContent = Math.round(tot) + ' MW of heat';
+  const gal = Math.round(r.water_gal).toLocaleString(), month = new Date(2023, 0, 1 + r.day).getMonth();
+  const cold = month <= 2 || month >= 10, say = [];
+  if (r.scenario !== 'normal') say.push(`<b>${r.scenario.replace('_', ' ')}.</b>`);
+  if (pct(sell) >= 25) say.push(`${cold ? 'Cold day: ' : ''}buildings bought <b style="color:var(--sell)">${pct(sell)}%</b> of the heat.`);
+  else say.push(`${cold ? '' : 'Warm day: '}almost nobody needs heat, so only <b style="color:var(--sell)">${pct(sell)}%</b> was sold.`);
+  if (st > 0.5) say.push(`<b style="color:var(--store)">${st.toFixed(0)} MW</b> went into the pit for later.`);
+  else if (st < -0.5) say.push(`The pit gave back <b style="color:var(--store)">${(-st).toFixed(0)} MW</b> to cover demand.`);
+  say.push(`The rest was thrown away, and the towers evaporated <b style="color:var(--tower)">${gal} gallons</b> of water.`);
+  document.getElementById('f-say').innerHTML = say.join(' ');
+}
+// Answer text -> paragraphs and bullet lists ("- " or "* " lines), each line through md().
+function answerHtml(text) {
+  return String(text || '').split(/\n\s*\n/).map(block => {
+    const lines = block.trim().split('\n'), bullets = lines.filter(l => /^\s*[-*•]\s+/.test(l));
+    if (!bullets.length) return `<p>${md(block.trim())}</p>`;
+    let html = '', list = [];
+    const flush = () => { if (list.length) { html += `<ul>${list.map(l => `<li>${md(l)}</li>`).join('')}</ul>`; list = []; } };
+    for (const l of lines) { if (/^\s*[-*•]\s+/.test(l)) list.push(l.replace(/^\s*[-*•]\s+/, '')); else { flush(); if (l.trim()) html += `<p>${md(l.trim())}</p>`; } }
+    flush(); return html;
+  }).join('');
+}
 // Minimal, safe markdown for answers: escape first, then **bold**, `code`, and line breaks.
 function md(s) { return esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\n/g, '<br>'); }
 function fmt(v) { if (v == null) return '—'; if (Math.abs(v) >= 1000) return Math.round(v).toLocaleString(); if (Math.abs(v) >= 100) return v.toFixed(0); if (Math.abs(v) >= 10) return v.toFixed(1); return (Math.round(v * 1000) / 1000).toString(); }
