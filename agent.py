@@ -692,7 +692,12 @@ async def ask_async(question: str, run_id: str | None = None, client=None, mcp=N
     last_rows: list | None = None
     warnings: list[str] = []
 
-    async with contextlib.AsyncExitStack() as stack:
+    # Manual stack: the MCP streamable-HTTP client can raise an ExceptionGroup ("unhandled errors in a
+    # TaskGroup") when its streams close, even after the answer is in hand. Closing in a guarded finally
+    # keeps the answer instead of turning it into a 503.
+    stack = contextlib.AsyncExitStack()
+    await stack.__aenter__()
+    try:
         mcp_tools: list[dict] = []
         if mcp is None and os.getenv("KEEWANO_PAT"):
             try:
@@ -794,6 +799,11 @@ async def ask_async(question: str, run_id: str | None = None, client=None, mcp=N
         else:
             if not answer:
                 answer = "I ran out of steps before reaching an answer."
+    finally:
+        try:
+            await stack.aclose()
+        except BaseException as e:  # noqa: BLE001 - see note above
+            warnings.append(f"MCP teardown: {str(e)[:200]}")
 
     out = {"answer": answer, "query": last_query, "rows": last_rows, "tool_calls": tool_calls}
     if warnings:

@@ -219,7 +219,11 @@ def ask(body: Ask):
         import agent
         return agent.ask(body.question, run_id=body.run_id)
     except Exception as e:  # noqa: BLE001
-        raise HTTPException(503, f"ask not available yet: {e}")
+        detail = str(e)
+        subs = getattr(e, "exceptions", None)   # ExceptionGroup from the MCP client: show the real cause
+        if subs:
+            detail += " :: " + "; ".join(f"{type(s).__name__}: {str(s)[:200]}" for s in subs)
+        raise HTTPException(503, f"ask failed: {detail}")
 
 
 @app.get("/decisions")
