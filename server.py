@@ -69,13 +69,18 @@ def _rebuild_keewano_runs(thermal) -> bool:
         idx = json.loads((RUNS_DIR / "index.json").read_text())
     except (FileNotFoundError, ValueError):
         return False
-    latest: dict[str, dict] = {}
+    import sites
+    latest: dict[tuple[str, str], dict] = {}
     for r in idx:
         if r.get("sim") == "alpine":
-            latest[r["scenario"]] = r  # index is append-ordered: newest last wins
+            latest[(r.get("site") or "lansing", r["scenario"])] = r  # append-ordered: newest last wins
     if not latest:
         return False
-    for sc, r in latest.items():
+    for (site, sc), r in latest.items():
+        try:
+            sites.check_id(site)
+        except ValueError:
+            continue
         policy_by_day, notes = None, None
         if sc == "agent":
             try:
@@ -86,7 +91,7 @@ def _rebuild_keewano_runs(thermal) -> bool:
             policy_by_day = {d["day"]: d["policy"] for d in changed}
             notes = {d["day"]: d["reason"][:256] for d in changed}
         thermal.run(scenario=sc, push=False, run_id=r["run_id"], policy_by_day=policy_by_day,
-                    policy_notes=notes)
+                    policy_notes=notes, site=site)
     return True
 
 
@@ -143,6 +148,16 @@ def light():
 class Ask(BaseModel):
     question: str
     run_id: Optional[str] = None  # Optional, not "str | None": pydantic evaluates it, and Python 3.9 cannot
+    site: Optional[str] = None    # default run = that site's latest normal run
+
+
+def _site(site: Optional[str]) -> str:
+    """A validated site id (default lansing); 404 for unknown or unfinished sites."""
+    import sites
+    try:
+        return sites.check_id(site)
+    except ValueError as e:
+        raise HTTPException(404, str(e))
 
 
 def _latest_run() -> dict | None:
@@ -150,7 +165,7 @@ def _latest_run() -> dict | None:
     return json.loads(runs[-1].read_text()) if runs else None
 
 
-def _run_job(run_id: str, scenario: str, push: bool, sim: str) -> None:
+def _run_job(run_id: str, scenario: str, push: bool, sim: str, site: str = "lansing") -> None:
     JOBS[run_id].update(status="simulating")
     try:
         if sim == "basic":
@@ -163,7 +178,7 @@ def _run_job(run_id: str, scenario: str, push: bool, sim: str) -> None:
                 JOBS[run_id].update(push=keewano.send_run(r))
         else:
             import thermal
-            r = thermal.run(scenario=scenario, push=push, run_id=run_id, save=True)
+            r = thermal.run(scenario=scenario, push=push, run_id=run_id, save=True, site=site)
             JOBS[run_id].update(events=r["n_events"], sent=r["n_sent"], summary=r["summary"])
         JOBS[run_id].update(status="done", finished=_now())
     except Exception as e:  # noqa: BLE001
@@ -172,17 +187,20 @@ def _run_job(run_id: str, scenario: str, push: bool, sim: str) -> None:
 
 @app.post("/run")
 def run(background: BackgroundTasks, scenario: str = "normal", push: bool = True, wait: bool = True,
-        sim: str = "alpine"):
+        sim: str = "alpine", site: Optional[str] = None):
     """wait=true (default): simulate (and push) now and return the summary. wait=false: queue it as a
-    background job and poll /jobs. sim=basic uses the first-build sim (thermal_basic.py)."""
+    background job and poll /jobs. sim=basic uses the first-build sim (thermal_basic.py, Lansing only).
+    site: a sites.py id (default lansing)."""
+    site = _site(site)
     if not wait or sim == "basic":
         run_id = f"{scenario}-{uuid.uuid4().hex[:6]}"
-        JOBS[run_id] = {"run_id": run_id, "scenario": scenario, "sim": sim, "status": "queued", "started": _now()}
-        background.add_task(_run_job, run_id, scenario, push, sim)
-        return {"run_id": run_id, "status": "queued"}
+        JOBS[run_id] = {"run_id": run_id, "scenario": scenario, "sim": sim, "site": site, "status": "queued",
+                        "started": _now()}
+        background.add_task(_run_job, run_id, scenario, push, sim, site)
+        return {"run_id": run_id, "site": site, "status": "queued"}
     import thermal
-    result = thermal.run(scenario=scenario, push=push, save=True)
-    return {"run_id": result["run_id"], "events": result["n_events"], "sent": result["n_sent"],
+    result = thermal.run(scenario=scenario, push=push, save=True, site=site)
+    return {"run_id": result["run_id"], "site": site, "events": result["n_events"], "sent": result["n_sent"],
             "summary": result["summary"]}
 
 
@@ -236,7 +254,10 @@ def report(run_id: str | None = None):
 def ask(body: Ask):
     try:
         import agent
-        return agent.ask(body.question, run_id=body.run_id)
+        run_id = body.run_id
+        if not run_id and body.site:
+            run_id = agent.latest_run("normal", sim="alpine", site=_site(body.site))
+        return agent.ask(body.question, run_id=run_id)
     except Exception as e:  # noqa: BLE001
         detail = str(e)
         subs = getattr(e, "exceptions", None)   # ExceptionGroup from the MCP client: show the real cause
@@ -272,25 +293,30 @@ def decisions(run_id: str | None = None):
     return {"decisions": flat, "run_id": detail.get("agent_run_id") if detail else None, "detail": detail}
 
 
-def _runs() -> list[dict]:
+def _runs(site: str | None = None) -> list[dict]:
     out = []
     for p in sorted(OUT.glob("run_*.json")):
         d = json.loads(p.read_text())
-        out.append({"run_id": d["run_id"], "scenario": d["scenario"], "computed_at": d["computed_at"],
+        s = d.get("site") or "lansing"
+        if site and s != site:
+            continue
+        out.append({"run_id": d["run_id"], "scenario": d["scenario"], "site": s, "computed_at": d["computed_at"],
                     "policy": d.get("policy", {}), "summary": d["summary"]})
     return out
 
 
 @app.get("/runs")
-def runs():
-    """Every local run, newest last. The page uses the latest per scenario.
-    "keewano_runs": the runs that were pushed to Keewano (outputs/runs/index.json)."""
+def runs(site: Optional[str] = None):
+    """Every local run of the site (default lansing), newest last. The page uses the latest per scenario.
+    "keewano_runs": that site's runs that were pushed to Keewano (outputs/runs/index.json; entries
+    without a "site" are Lansing's)."""
+    site = _site(site)
     try:
         import agent
-        kw = agent.load_index()
+        kw = [r for r in agent.load_index() if (r.get("site") or "lansing") == site]
     except Exception:  # noqa: BLE001
         kw = []
-    return {"runs": _runs(), "keewano_runs": kw}
+    return {"site": site, "runs": _runs(site), "keewano_runs": kw}
 
 
 @app.get("/events")
@@ -318,45 +344,155 @@ def events(run_id: str, daily: bool = True):
 
 
 @app.get("/compare")
-def compare(scenario: str = "normal"):
+def compare(scenario: str = "normal", site: Optional[str] = None):
     """The same year twice: towers on the chiller condensers (default) vs. dry condensers (prefer_dry).
     This is the agent's water-vs-cost lever."""
     import thermal
-    a = thermal.run(scenario=scenario, push=False, save=False)["summary"]
-    b = thermal.run(scenario=scenario, push=False, policy={"prefer_dry": True}, save=False)["summary"]
+    site = _site(site)
+    a = thermal.run(scenario=scenario, push=False, save=False, site=site)["summary"]
+    b = thermal.run(scenario=scenario, push=False, policy={"prefer_dry": True}, save=False, site=site)["summary"]
     keys = ["pue", "wue_l_per_kwh", "erf", "water_mgal", "cost_musd", "co2_kt", "hours_tower", "share_reused"]
     return {"scenario": scenario, "policy_b": {"prefer_dry": True},
             "rows": [{"metric": k, "default": a[k], "prefer_dry": b[k],
                       "delta_pct": (b[k] - a[k]) / a[k] * 100 if a[k] else None} for k in keys]}
 
 
-_design_cache: dict = {}
+_design_cache: dict[str, dict] = {}   # site id -> {"rec", "at"}
+
+
+def _design(site: str, refresh: bool = False) -> dict:
+    import design
+    with _lock:
+        hit = _design_cache.get(site)
+    if refresh or not hit:
+        hit = {"rec": design.recommend(site=site), "at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+        with _lock:
+            _design_cache[site] = hit
+    return hit
 
 
 @app.get("/design")
-def design_recommend(refresh: bool = False):
+def design_recommend(refresh: bool = False, site: Optional[str] = None):
     """How this site should reuse its heat: ranked pathways (network to real buildings, trucked storage,
     co-located greenhouse / aquaculture / drying), the network route and methods, pit location, and a
-    plain-English recommendation. Computed from data/customers.csv + config/design.yaml (~1-2 s, cached)."""
-    import design
-    if refresh or "rec" not in _design_cache:
-        _design_cache["rec"] = design.recommend()
-        _design_cache["at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    return {**_design_cache["rec"], "computed_at": _design_cache["at"]}
+    plain-English recommendation. Computed from the site's customers.csv + config/design.yaml (~1-2 s,
+    cached per site). site: a sites.py id (default lansing)."""
+    site = _site(site)
+    hit = _design(site, refresh)
+    return {**hit["rec"], "computed_at": hit["at"]}
 
 
 @app.get("/design/geojson")
-def design_geojson():
+def design_geojson(site: Optional[str] = None):
     """Map layer for /design: the site, every building cluster (connected or not, which shore) and pipe segments."""
     import design
-    return design.geojson(design_recommend()) if "rec" not in _design_cache else design.geojson(_design_cache["rec"])
+    site = _site(site)
+    return design.geojson(_design(site)["rec"], site=site)
+
+
+# ------------------------------------------------------------------------------------ sites
+
+class SiteIn(BaseModel):
+    name: Optional[str] = None
+    address: Optional[str] = None     # an address, or "lat, lon"
+    lat: Optional[float] = None
+    lon: Optional[float] = None
+    it_mw: Optional[float] = 100.0
+
+
+MAX_BUILDS = 2
+
+
+def _clean(text: Optional[str], n: int, what: str) -> Optional[str]:
+    if text is None:
+        return None
+    text = " ".join(str(text).split())
+    if len(text) > n:
+        raise HTTPException(422, f"{what} is too long (max {n} characters)")
+    if any(ord(ch) < 32 for ch in text):
+        raise HTTPException(422, f"{what} has control characters")
+    return text or None
+
+
+def _headline(meta: dict) -> dict | None:
+    """Lansing's headline comes from the design cache (computed once); built sites store theirs."""
+    if meta.get("id") != "lansing":
+        return meta.get("headline")
+    try:
+        rec = _design("lansing")["rec"]
+    except Exception:  # noqa: BLE001
+        return None
+    s = rec["summary"]
+    best = next((x for x in rec["pathways"] if x["verdict"] == "recommend"), None)
+    return {"heat_available_gwh": s["heat_available_gwh"], "share_reused": s["share_reused"],
+            "npv_recommended_usd": s["npv_recommended_usd"], "co2_avoided_t": s["co2_avoided_t"],
+            "best_pathway": best["label"] if best else None, "first_lines": rec["recommendation"][:3]}
+
+
+def _site_view(meta: dict, full: bool = False) -> dict:
+    keys = ("id", "name", "address", "display_name", "lat", "lon", "it_mw", "created", "status", "step",
+            "progress", "ready_note", "error", "failed_step", "example", "run_id", "started", "finished")
+    out = {k: meta.get(k) for k in keys if k in meta}
+    out["headline"] = _headline(meta) if meta.get("status") == "ready" else None
+    if full:
+        out.update({k: meta.get(k) for k in ("steps", "sources", "notes", "facts", "keewano", "sim", "radius_km",
+                                              "seconds", "updated") if k in meta})
+        out.setdefault("steps", __import__("sites").STEPS)
+    return out
+
+
+@app.post("/sites")
+def create_site(body: SiteIn):
+    """Model a new location: {address | "lat, lon" | lat+lon, name?, it_mw (1-1000, default 100)}. Builds in
+    the background (geocoding -> weather -> buildings -> demand -> simulating -> streaming to Keewano ->
+    designing -> ready); poll GET /sites/{site_id}."""
+    import sites
+    name = _clean(body.name, 80, "name")
+    address = _clean(body.address, 200, "address")
+    it_mw = 100.0 if body.it_mw is None else float(body.it_mw)
+    if not 1 <= it_mw <= 1000:
+        raise HTTPException(422, "it_mw must be between 1 and 1000")
+    if (body.lat is None) != (body.lon is None):
+        raise HTTPException(422, "give both lat and lon, or neither")
+    if body.lat is not None and not (-90 <= body.lat <= 90 and -180 <= body.lon <= 180):
+        raise HTTPException(422, "lat must be -90..90 and lon -180..180")
+    if body.lat is None and not (address or name):
+        raise HTTPException(422, "give an address (or \"lat, lon\"), or lat and lon")
+    building = sum(1 for m in sites.list_sites() if m.get("status") in ("queued", "building"))
+    if building >= MAX_BUILDS:
+        raise HTTPException(429, "two sites are already building; try again in a minute")
+    try:
+        sid = sites.start_site(name=name, address=address, lat=body.lat, lon=body.lon, it_mw=it_mw)
+    except ValueError as e:
+        raise HTTPException(422, str(e)[:200])
+    return {"site_id": sid, "status": "queued"}
+
+
+@app.get("/sites")
+def list_sites():
+    """Every site, Lansing (the worked example) first: id, name, status, created, headline numbers."""
+    import sites
+    return {"sites": [_site_view(m) for m in sites.list_sites()]}
+
+
+@app.get("/sites/{site_id}")
+def get_site(site_id: str):
+    """One site's meta: status/step/progress while building, then sources, notes, Keewano push, headline."""
+    import sites
+    meta = sites.read_meta(site_id) if sites.ID_RE.match(site_id or "") else None
+    if not meta:
+        raise HTTPException(404, f"no site {site_id!r}")
+    return _site_view(meta, full=True)
 
 
 @app.get("/sensitivity")
-def sensitivity(scenario: str = "normal"):
+def sensitivity(scenario: str = "normal", site: Optional[str] = None):
     """One-at-a-time +/-25% on the 'assumption - verify' constants; which ones move WUE and ERF."""
     import copy
     import thermal
+    site = _site(site)
+    if site != "lansing":
+        return _sensitivity_site(scenario, site)
     base = thermal.run(scenario=scenario, push=False, save=False)["summary"]
     knobs = [("cooling", "dry_cooler_capacity_mw"), ("cooling", "water_gal_per_kwh"),
              ("heat_network", "route_km"), ("heat_network", "heat_price_usd_per_mwh"),
@@ -377,6 +513,30 @@ def sensitivity(scenario: str = "normal"):
     finally:
         thermal.CFG.clear(); thermal.CFG.update(orig)
     return {"scenario": scenario, "base": base, "rows": rows}
+
+
+SENS_KNOBS = [("cooling", "dry_cooler_capacity_mw"), ("cooling", "water_gal_per_kwh"),
+              ("heat_network", "route_km"), ("heat_network", "heat_price_usd_per_mwh"),
+              ("storage", "capacity_mwh"), ("storage", "max_charge_mw"), ("prices", "electricity_usd_per_mwh")]
+
+
+def _sensitivity_site(scenario: str, site: str) -> dict:
+    """/sensitivity for a sites.py site: the same knobs on a copy of its config (thermal.CFG untouched)."""
+    import copy
+    import thermal
+    orig = thermal.site_cfg(site)
+    base = thermal.run(scenario=scenario, push=False, save=False, site=site)["summary"]
+    rows = []
+    for sect, k in SENS_KNOBS:
+        res = {"knob": f"{sect}.{k}", "base": orig[sect][k]}
+        for lab, f in (("low", 0.75), ("high", 1.25)):
+            cfg = copy.deepcopy(orig)
+            cfg[sect][k] = orig[sect][k] * f
+            s = thermal.run(scenario=scenario, push=False, save=False, site=site, cfg=cfg)["summary"]
+            for m, key in (("wue", "wue_l_per_kwh"), ("erf", "erf"), ("cost", "cost_musd")):
+                res[f"{m}_{lab}_pct"] = (s[key] - base[key]) / base[key] * 100 if base[key] else 0.0
+        rows.append(res)
+    return {"scenario": scenario, "site": site, "base": base, "rows": rows}
 
 
 @app.get("/health")

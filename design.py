@@ -22,6 +22,8 @@ Every cost is in config/design.yaml with its source; most are "assumption - veri
 """
 from __future__ import annotations
 
+import contextlib
+import contextvars
 import math
 from functools import lru_cache
 from pathlib import Path
@@ -34,11 +36,46 @@ ROOT = Path(__file__).resolve().parent
 MMBTU_MWH = 0.293071  # 1 MMBtu = 0.293071 MWh
 
 
-@lru_cache(maxsize=1)
-def _cfgs() -> tuple[dict, dict]:
-    site = yaml.safe_load((ROOT / "config" / "site.yaml").read_text())
+# The site every helper works on. recommend()/geojson()/load_* take site= and set it for their duration,
+# so the inner helpers (cluster, _grow, ...) keep their signatures. Default: Lansing.
+_SITE: contextvars.ContextVar[str] = contextvars.ContextVar("design_site", default="lansing")
+
+
+@lru_cache(maxsize=16)
+def _cfgs_for(site: str) -> tuple[dict, dict]:
+    import sites
+    p = sites.paths(sites.check_id(site))
+    cfg = yaml.safe_load(p["site"].read_text())
     design = yaml.safe_load((ROOT / "config" / "design.yaml").read_text())
-    return site, design
+    if site != "lansing":   # the Cayuga Lake routing block is Lansing's only
+        design["network"]["lake"] = {"allow_crossing": True}
+    return cfg, design
+
+
+def _cfgs() -> tuple[dict, dict]:
+    return _cfgs_for(_SITE.get())
+
+
+@contextlib.contextmanager
+def using(site: str | None):
+    """Run the block against `site` (None: keep the current one)."""
+    if site is None:
+        yield
+        return
+    tok = _SITE.set(site)
+    try:
+        yield
+    finally:
+        _SITE.reset(tok)
+
+
+def _paths() -> dict:
+    import sites
+    return sites.paths(_SITE.get())
+
+
+def _radius_km() -> float:
+    return float(_cfgs()[0].get("design_radius_km", 15))
 
 
 def _pvf(r: float, n: int) -> float:
@@ -56,6 +93,8 @@ def _km(lat1, lon1, lat2, lon2):
 def _west(lat, lon):
     """True for points on the far (west) shore of Cayuga Lake from the site."""
     _, d = _cfgs()
+    if "shore" not in d["network"].get("lake", {}):
+        return np.zeros(np.shape(lat), bool) if np.ndim(lat) else np.False_
     (la1, lo1), (la2, lo2) = d["network"]["lake"]["shore"]
     line = lo1 + (np.asarray(lat) - la1) / (la2 - la1) * (lo2 - lo1)
     return np.asarray(lon) < line
@@ -86,9 +125,14 @@ def _size_factor(peak_mw):
 
 # ------------------------------------------------------------------------------------- inputs
 
-def load_buildings() -> pd.DataFrame:
+def load_buildings(site: str | None = None) -> pd.DataFrame:
+    with using(site):
+        return _load_buildings()
+
+
+def _load_buildings() -> pd.DataFrame:
     site, d = _cfgs()
-    b = pd.read_csv(ROOT / "data" / "customers.csv")
+    b = pd.read_csv(_paths()["customers"])
     fuels = d["fuels"]
     b["fuel"] = b["main_fuel"].fillna("unknown").where(b["main_fuel"].isin(list(fuels)), "unknown")
     default_cost = b["fuel"].map({k: v["usd_per_mmbtu"] for k, v in fuels.items()})
@@ -101,10 +145,12 @@ def load_buildings() -> pd.DataFrame:
     return b
 
 
-def load_hourly() -> pd.DataFrame:
+def load_hourly(site: str | None = None) -> pd.DataFrame:
     """Captured heat (MW) and outdoor temperature per hour, plus the buildings' normalized demand shape."""
-    s = pd.read_csv(ROOT / "data" / "supply.csv")
-    dm = pd.read_csv(ROOT / "data" / "demand.csv")
+    with using(site):
+        p = _paths()
+    s = pd.read_csv(p["supply"])
+    dm = pd.read_csv(p["demand"])
     shape = dm["demand_mw_p50"].to_numpy()
     return pd.DataFrame({"avail_mw": s["source_heat_mw_p50"].to_numpy(), "outdoor_c": dm["outdoor_c"].to_numpy(),
                          "bldg_shape": shape / shape.sum()})
@@ -120,14 +166,17 @@ def cluster(b: pd.DataFrame) -> pd.DataFrame:
     b["w_val"] = b["mwh"] * b["value_usd_mwh"]
     b["w_co2"] = b["mwh"] * b["co2_t_mwh"]
     b["mwh_direct"] = b["mwh"] * b["direct_ok"]
+    # rows can be blocks of homes (sites.py aggregates small homes): count buildings, not rows
+    b["nb"] = b["n_buildings"].fillna(1).astype(int) if "n_buildings" in b else 1
+    b["nb_home"] = b["nb"] * b["category"].isin(["Residential", "Farm residence"])
     g = b.groupby(["cx", "cy"])
     c = pd.DataFrame({
-        "n": g.size(), "mwh": g["mwh"].sum(), "peak_mw": g["peak_mw"].sum(),
+        "n": g["nb"].sum(), "mwh": g["mwh"].sum(), "peak_mw": g["peak_mw"].sum(),
         "value_usd_mwh": g["w_val"].sum() / g["mwh"].sum(), "co2_t_mwh": g["w_co2"].sum() / g["mwh"].sum(),
         "direct_share": g["mwh_direct"].sum() / g["mwh"].sum(),
         "lat": g["lat"].mean(), "lon": g["lon"].mean(),
         "schools": g["nrel_type"].apply(lambda s: int((s == "primaryschool").sum())),
-        "homes": g["category"].apply(lambda s: int(s.isin(["Residential", "Farm residence"]).sum())),
+        "homes": g["nb_home"].sum().astype(int),
         "top": g.apply(lambda df: str(df.loc[df["mwh"].idxmax(), "name"]), include_groups=False),
     }).reset_index()
     c["site_km"] = _route_km(lat0, lon0, c["lat"].to_numpy(), c["lon"].to_numpy())
@@ -471,8 +520,15 @@ def pit_location(net: dict) -> dict:
 
 # ---------------------------------------------------------------------------------- recommend
 
-def recommend() -> dict:
+def recommend(site: str | None = None) -> dict:
+    """site: "lansing" (default) or a sites.py id."""
+    with using(site):
+        return _recommend()
+
+
+def _recommend() -> dict:
     site, d = _cfgs()
+    radius = _radius_km()
     b = load_buildings()
     h = load_hourly()
     c = cluster(b)
@@ -504,7 +560,8 @@ def recommend() -> dict:
                    f"{len(net['clusters'])} clusters, {net['pipe_km']} km of pipe; methods: "
                    + ", ".join(f"{d['methods'][k]['label']} ({v} bldgs)" for k, v in net["methods"].items())
                    if net["connected"] else
-                   f"No network pays off. The {len(b):,} buildings within 15 km (mostly single-family homes) use "
+                   f"No network pays off. The {int(b['n_buildings'].sum()) if 'n_buildings' in b else len(b):,} buildings "
+                   f"within {radius:g} km{' (mostly single-family homes)' if _mostly_homes(b) else ''} use "
                    f"{b['mwh'].sum() / 1000:,.0f} GWh/yr, about {lhd:.2f} MWh per metre of pipe if all were "
                    f"connected, below the ~{d['network']['viable_mwh_per_m']} MWh/m district heat needs. The best "
                    f"network found ({net['best_candidate'].get('buildings', 0)} buildings, "
@@ -554,12 +611,15 @@ def recommend() -> dict:
     for x in anc:
         x.pop("hourly_mw")
     return {
-        "site": site["site"]["name"],
+        "site": site["site"]["name"], "site_id": site["site"]["id"],
+        "location": {"lat": site["site"]["lat"], "lon": site["site"]["lon"],
+                     "it_mw": site["data_center"]["it_load_mw"]},
         "summary": {"heat_available_gwh": round(avail_mwh / 1000, 1), "heat_reused_gwh": round(reused_mwh / 1000, 1),
                     "share_reused": round(reused_mwh / avail_mwh, 4),
                     "npv_recommended_usd": round(sum(p["npv_usd"] for p in rec)),
                     "co2_avoided_t": round(sum(p["co2_avoided_t"] for p in rec)),
-                    "buildings_within_15km": int(len(b)), "buildings_gwh": round(float(b["mwh"].sum()) / 1000, 1),
+                    "buildings_within_15km": int(b["n_buildings"].sum()) if "n_buildings" in b else int(len(b)),
+                    "radius_km": radius, "demand_estimated": bool("estimated" in b), "buildings_gwh": round(float(b["mwh"].sum()) / 1000, 1),
                     "sim_route_km": site["heat_network"]["route_km"],
                     "design_route_km": net["pipe_km"] if net["connected"] else None},
         "recommendation": lines,
@@ -585,8 +645,18 @@ def _monthly(avail, net_mw, anc, h) -> list[dict]:
     return [{"month": i.month, **{k: round(float(v), 2) for k, v in r.items()}} for i, r in m.iterrows()]
 
 
-def geojson(rec: dict | None = None) -> dict:
+def _mostly_homes(b: pd.DataFrame) -> bool:
+    w = b["n_buildings"] if "n_buildings" in b else pd.Series(1, index=b.index)
+    return float(w[b["category"].isin(["Residential", "Farm residence"])].sum()) > 0.5 * float(w.sum())
+
+
+def geojson(rec: dict | None = None, site: str | None = None) -> dict:
     """Site, building clusters (connected or not) and pipe segments, for a map."""
+    with using(site):
+        return _geojson(rec)
+
+
+def _geojson(rec: dict | None = None) -> dict:
     site, _ = _cfgs()
     rec = rec or recommend()
     net = rec["network"]

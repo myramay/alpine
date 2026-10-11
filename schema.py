@@ -57,6 +57,8 @@ EVENTS = [
     (2033, "heat_delivered_kw", "uint", "heat delivered at the buildings after pipe loss and heat pump, kW"),
     (2034, "electricity_cost_usd", "price_usd_cent", "facility electricity cost this hour (cents)"),
     (2035, "water_cost_usd", "price_usd_cent", "water cost this hour (cents)"),
+    # multi-site (sites.py); append-only
+    (2036, "site", "string", "site id, emitted once at the start of a run"),
 ]
 
 EVENT_ID = {name: eid for eid, name, _, _ in EVENTS}
@@ -86,17 +88,19 @@ def to_int(v) -> int:
 
 
 def rows_to_events(rows: list[dict], run_id: str, scenario: str, policy_notes: dict | None = None,
-                   context: list[str] = ALPINE_CONTEXT, measures: list[str] = ALPINE_MEASURES) -> list["Event"]:
+                   context: list[str] = ALPINE_CONTEXT, measures: list[str] = ALPINE_MEASURES,
+                   site: str | None = None) -> list["Event"]:
     """Hourly rows already in schema units (kW, kWh, gal, kg, cents, pct) -> chronological events.
     Each row needs hour, day, month and every name in context + measures. price_usd_cent values may be
-    negative (signed); every other number is clamped at 0."""
+    negative (signed); every other number is clamped at 0. site: when given, a `site` event follows
+    run_id and scenario (so queries can filter by site)."""
     policy_notes = policy_notes or {}
     events, last_day, last_month = [], None, None
     for r in rows:
         h, day = int(r["hour"]), int(r["day"])
         ts, out = BASE_TS + h * 3600, []
         if h == rows[0]["hour"]:
-            out += [("run_id", run_id), ("scenario", scenario)]
+            out += [("run_id", run_id), ("scenario", scenario)] + ([("site", site)] if site else [])
         if day != last_day:
             out.append(("day", day)); last_day = day
         if r["month"] != last_month:

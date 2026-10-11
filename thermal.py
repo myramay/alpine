@@ -42,9 +42,24 @@ EVENT_NAMES = [
 BOILER_EFF = 0.85  # gas boiler efficiency the delivered heat replaces; assumption - verify
 
 
-def load_inputs() -> pd.DataFrame:
-    s = pd.read_csv("data/supply.csv", parse_dates=["timestamp"])
-    d = pd.read_csv("data/demand.csv", parse_dates=["timestamp"])
+def site_cfg(site: str = "lansing") -> dict:
+    """Lansing: the module-level CFG (the server's /compare and /sensitivity mutate it). Other sites:
+    sites/<id>/site.yaml (sites.py)."""
+    if site in (None, "lansing"):
+        return CFG
+    import sites
+    return sites.load_cfg(site)
+
+
+def load_inputs(site: str = "lansing") -> pd.DataFrame:
+    if site in (None, "lansing"):
+        sp, dp = "data/supply.csv", "data/demand.csv"
+    else:
+        import sites
+        p = sites.paths(sites.check_id(site))
+        sp, dp = p["supply"], p["demand"]
+    s = pd.read_csv(sp, parse_dates=["timestamp"])
+    d = pd.read_csv(dp, parse_dates=["timestamp"])
     df = s.merge(d, on="timestamp")
     df["hour"] = range(len(df))
     df["day"] = df["hour"] // 24
@@ -58,14 +73,15 @@ def cop(t_source_c: float, t_sink_c: float, carnot_fraction: float) -> float:
     return max(1.0, carnot_fraction * tk / max(tk - ts, 1.0))
 
 
-def _scenario_window(scenario: str) -> tuple[int, int, dict]:
-    sc = CFG["scenarios"].get(scenario) or {}
+def _scenario_window(scenario: str, cfg: dict | None = None) -> tuple[int, int, dict]:
+    sc = (cfg or CFG)["scenarios"].get(scenario) or {}
     return sc.get("start_hour", -1), sc.get("hours", 0), sc
 
 
 def run(scenario: str = "normal", push: bool = True, policy: dict | None = None,
         policy_by_day: dict[int, dict] | None = None, policy_notes: dict[int, str] | None = None,
-        run_id: str | None = None, save: bool | None = None) -> dict:
+        run_id: str | None = None, save: bool | None = None, site: str = "lansing",
+        cfg: dict | None = None) -> dict:
     """Simulate a typical year. policy_by_day lets agent.py change the policy from a given day on;
     policy_notes (day -> reason) become policy_change events in Keewano.
 
@@ -73,11 +89,15 @@ def run(scenario: str = "normal", push: bool = True, policy: dict | None = None,
       out/run_<id>.json + out/events_<id>.csv   (the web page's runs)        unless save=False
       outputs/runs/<id>.csv + index.json        (runs that exist in Keewano) when pushed, or save=True
     save=None (default) means "same as push" for the Keewano index. What-if calls (/compare,
-    /sensitivity, tests) pass save=False so nothing is written and nothing shows up as a run."""
-    df = load_inputs()
-    c, hn, st, pr, em = CFG["cooling"], CFG["heat_network"], CFG["storage"], CFG["prices"], CFG["emissions"]
-    dc = CFG["data_center"]
-    start, nh, sc = _scenario_window(scenario)
+    /sensitivity, tests) pass save=False so nothing is written and nothing shows up as a run.
+    site: "lansing" (default, config/site.yaml + data/) or a sites.py id (sites/<id>/).
+    cfg: a what-if copy of the site's config (/sensitivity on a non-Lansing site); default the site's own."""
+    site = site or "lansing"
+    cfg = cfg or site_cfg(site)
+    df = load_inputs(site)
+    c, hn, st, pr, em = cfg["cooling"], cfg["heat_network"], cfg["storage"], cfg["prices"], cfg["emissions"]
+    dc = cfg["data_center"]
+    start, nh, sc = _scenario_window(scenario, cfg)
     pol = dict(DEFAULT_POLICY, **(policy or {}))
     policy_by_day = policy_by_day or {}
 
@@ -208,31 +228,36 @@ def run(scenario: str = "normal", push: bool = True, policy: dict | None = None,
     if save is not False:
         out = Path("out"); out.mkdir(exist_ok=True)
         (out / f"run_{run_id}.json").write_text(json.dumps({
-            "run_id": run_id, "scenario": scenario, "policy": pol,
+            "run_id": run_id, "scenario": scenario, "site": site, "policy": pol,
             "computed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "summary": summary}, indent=2))
         pd.DataFrame([{"name": e["name"], "value": e["value"], **e["tags"]} for e in events]) \
             .to_csv(out / f"events_{run_id}.csv", index=False)
 
-    kw_run = keewano_run(kw_rows, run_id, scenario, policy_notes)
+    kw_run = keewano_run(kw_rows, run_id, scenario, policy_notes, site_id=cfg["site"]["id"])
     if push if save is None else save:
-        save_hourly(kw_rows, run_id, scenario, summary, pol)
-    sent = 0
+        save_hourly(kw_rows, run_id, scenario, summary, pol, site=site)
+    sent, push_result = 0, None
     if push:
         import keewano
-        sent = keewano.send_run(kw_run)["accepted"]
-    return {"run_id": run_id, "n_events": len(events), "n_sent": sent, "summary": summary, "events": events,
-            "kw_run": kw_run}
+        push_result = keewano.send_run(kw_run)
+        sent = push_result["accepted"]
+    return {"run_id": run_id, "site": site, "n_events": len(events), "n_sent": sent, "push": push_result,
+            "summary": summary, "events": events, "kw_run": kw_run}
 
 
-def keewano_run(kw_rows: list[dict], run_id: str, scenario: str, policy_notes: dict | None = None):
-    """The run as Keewano integer events (schema.py): what actually gets ingested."""
+def keewano_run(kw_rows: list[dict], run_id: str, scenario: str, policy_notes: dict | None = None,
+                site_id: str | None = None):
+    """The run as Keewano integer events (schema.py): what actually gets ingested. The entity is
+    uuid5("<site_id>:<run_id>") and a `site` event follows run_id/scenario."""
     import schema
-    return schema.Run(run_id=run_id, scenario=scenario, site_id=CFG["site"]["id"],
-                      events=schema.rows_to_events(kw_rows, run_id, scenario, policy_notes), hourly=kw_rows)
+    site_id = site_id or CFG["site"]["id"]
+    return schema.Run(run_id=run_id, scenario=scenario, site_id=site_id,
+                      events=schema.rows_to_events(kw_rows, run_id, scenario, policy_notes, site=site_id),
+                      hourly=kw_rows)
 
 
 def save_hourly(kw_rows: list[dict], run_id: str, scenario: str, summary: dict, policy: dict,
-                out_dir: str = "outputs/runs") -> Path:
+                out_dir: str = "outputs/runs", site: str = "lansing") -> Path:
     """Hourly rows in Keewano units to outputs/runs/<run_id>.csv plus an index.json entry; agent.py reads these."""
     d = Path(out_dir); d.mkdir(parents=True, exist_ok=True)
     path = d / f"{run_id}.csv"
@@ -243,7 +268,7 @@ def save_hourly(kw_rows: list[dict], run_id: str, scenario: str, summary: dict, 
     except (FileNotFoundError, ValueError):
         idx = []
     idx = [e for e in idx if e.get("run_id") != run_id]
-    idx.append({"run_id": run_id, "scenario": scenario, "sim": "alpine", "policy": policy,
+    idx.append({"run_id": run_id, "scenario": scenario, "sim": "alpine", "site": site or "lansing", "policy": policy,
                 "created": datetime.now(timezone.utc).isoformat(timespec="seconds"), "totals": summary})
     idx_path.write_text(json.dumps(idx, indent=1, default=str))
     return path
@@ -254,7 +279,8 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--scenario", default="normal", choices=list(CFG["scenarios"]) + ["all"])
     ap.add_argument("--push", action="store_true")
+    ap.add_argument("--site", default="lansing")
     a = ap.parse_args()
     for sc in (list(CFG["scenarios"]) if a.scenario == "all" else [a.scenario]):
-        r = run(scenario=sc, push=a.push, save=True)
+        r = run(scenario=sc, push=a.push, save=True, site=a.site)
         print(json.dumps({k: r[k] for k in ("run_id", "n_events", "n_sent", "summary")}, indent=2))

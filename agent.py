@@ -110,9 +110,12 @@ def load_index() -> list[dict]:
         return []
 
 
-def latest_run(scenario: str | None = None, sim: str | None = None) -> str | None:
+def latest_run(scenario: str | None = None, sim: str | None = None, site: str | None = "lansing") -> str | None:
+    """Newest run in index.json. site: "lansing" by default (entries without "site" are Lansing's);
+    None means any site."""
     runs = [r for r in load_index() if (scenario is None or r.get("scenario") == scenario)
-            and (sim is None or r.get("sim", "basic") == sim)]
+            and (sim is None or r.get("sim", "basic") == sim)
+            and (site is None or (r.get("site") or "lansing") == site)]
     if not runs:
         return None
     runs.sort(key=lambda r: str(r.get("created", "")))
@@ -626,13 +629,25 @@ or two sentences, and say which run (run_id and scenario) it is about.
 
 def _known_runs_text(run_id: str | None) -> str:
     runs = load_index()
-    lines = [f"- {r.get('run_id')} (scenario {r.get('scenario')}, created {r.get('created')})"
+    lines = [f"- {r.get('run_id')} (site {r.get('site') or 'lansing'}, scenario {r.get('scenario')}, "
+             f"created {r.get('created')})"
              for r in runs[-30:]]
     txt = "## Known runs (outputs/runs/index.json)\n" + ("\n".join(lines) if lines else "- none listed")
     if os.environ.get("KEEWANO_PROJECT_ID"):
         txt += f"\n\nKeewano projectId for MCP tools: {os.environ['KEEWANO_PROJECT_ID']}"
     if run_id:
         txt += f"\n\nThe user is looking at run {run_id}; default to it."
+        site = next((r.get("site") for r in runs if r.get("run_id") == run_id), None)
+        if site and site != "lansing":
+            try:
+                import sites
+                m = sites.read_meta(site) or {}
+                txt += (f" That run is NOT Lansing: it is site '{site}' ({m.get('name', site)}, "
+                        f"{m.get('it_mw', '?')} MW IT, lat {m.get('lat')}, lon {m.get('lon')}); its heat demand is "
+                        f"estimated from OpenStreetMap buildings. Its events carry `site = '{site}'`. The site "
+                        f"facts above are Lansing's defaults, which this site reuses except location and size.")
+            except Exception:  # noqa: BLE001
+                pass
     else:
         default = latest_run("normal")
         if default:
