@@ -13,6 +13,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 load_dotenv()
@@ -21,6 +22,22 @@ OUT.mkdir(exist_ok=True)
 
 app = FastAPI(title="Alpine")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+WEB = Path(__file__).parent / "web"
+
+
+@app.on_event("startup")
+def _ensure_runs():
+    """A fresh deploy has no out/: simulate the four scenarios once (about 5 s) so /report works immediately."""
+    if os.environ.get("ALPINE_AUTORUN", "1") == "1" and not list(OUT.glob("run_*.json")):
+        import thermal
+        for sc in thermal.CFG["scenarios"]:
+            thermal.run(scenario=sc, push=False)
+
+
+@app.get("/")
+def index():
+    """The web page, served from the API so one URL does everything (the page talks to same-origin by default)."""
+    return FileResponse(WEB / "index.html")
 
 
 class Ask(BaseModel):

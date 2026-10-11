@@ -1,4 +1,4 @@
-PY ?= python
+PY ?= python3
 
 .PHONY: setup runs demo test
 

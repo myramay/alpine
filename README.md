@@ -32,7 +32,8 @@ uv venv --python 3.11 && source .venv/bin/activate && uv pip install -r requirem
 cp .env.example .env   # fill in keys
 python thermal.py --scenario normal --push
 python agent.py --run <run_id>
-uvicorn server:app --port 8000
-# open web/index.html (set API_BASE at the top if the API is not on localhost:8000)
+uvicorn server:app --port 8000   # then open http://localhost:8000/
 pytest -q
 ```
+
+Or `make demo`, which runs all four scenarios and starts the API. The API serves the page at `/`, so one deployment (Railway: `Procfile` and `railway.json` are included) is the whole app; on first start with no `out/` it simulates the four scenarios itself.
