@@ -6,3 +6,5 @@ outputs/runs/*.csv
 .DS_Store
 *.pyc
 out/
+web/vendor/src/node_modules/
+web/vendor/src/package-lock.json

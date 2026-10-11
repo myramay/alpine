@@ -1,0 +1,16 @@
+{
+  "name": "alpine-vendor",
+  "private": true,
+  "description": "Build-only deps for the prebuilt bundles in web/vendor (see README.md).",
+  "scripts": {
+    "build:pipeline": "esbuild pipeline-entry.tsx --bundle --minify --format=iife --target=es2020 --jsx=automatic --define:process.env.NODE_ENV=\\\"production\\\" --outfile=../pipeline-bundle.js"
+  },
+  "dependencies": {
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "esbuild": "^0.28.2",
+    "lucide-react": "^1.55.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  }
+}

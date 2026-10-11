@@ -94,6 +94,11 @@ def site_js():
     return FileResponse(WEB / "site.js", media_type="application/javascript")
 
 
+@app.get("/site-light.js")
+def site_light_js():
+    return FileResponse(WEB / "site-light.js", media_type="application/javascript")
+
+
 @app.get("/skyline.js")
 def skyline_js():
     return FileResponse(WEB / "skyline.js", media_type="application/javascript")
@@ -117,8 +122,21 @@ def vendor(name: str):
 
 @app.get("/")
 def index():
-    """The web page, served from the API so one URL does everything (the page talks to same-origin by default)."""
+    """The production page (light design): Site, Report, Pipeline, Design, Ask, Decisions, Model.
+    Served from the API so one URL does everything (the page talks to same-origin by default)."""
+    return FileResponse(WEB / "light.html")
+
+
+@app.get("/classic")
+def classic():
+    """The original dark page (web/index.html), kept with all its features."""
     return FileResponse(WEB / "index.html")
+
+
+@app.get("/light")
+def light():
+    """Same as / (the light page); kept so old links keep working."""
+    return FileResponse(WEB / "light.html")
 
 
 class Ask(BaseModel):

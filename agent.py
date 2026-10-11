@@ -509,6 +509,8 @@ def report(run_id: str | None = None) -> dict:
     if not run_id:
         raise RuntimeError("no normal run in outputs/runs/index.json")
     r = _keewano().run_report(run_id)
+    if any(r[k]["value"] is None for k in ("pue", "wue", "erf")):
+        raise RuntimeError(f"{run_id} has no events in Keewano (not ingested yet, or still processing)")
     units = {"pue": ("PUE", "facility kWh / IT kWh"), "wue": ("WUE", "L / IT kWh"),
              "erf": ("ERF", "heat reused / energy in")}
     return {"run_id": run_id, "cached": False, "source": "keewano",

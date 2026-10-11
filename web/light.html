@@ -1,0 +1,786 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Alpine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%278%27 fill=%27%23fff%27/%3E%3Cpath d=%27M7 24 L16 8 L25 24 Z%27 fill=%27%23377a53%27/%3E%3C/svg%3E">
+<link rel="stylesheet" href="./vendor/skyline.css">
+<style>
+  :root {
+    /* BuildPipeline tokens */
+    --bg:#fafafa; --surface:#fff; --ink:#171717; --muted:#686868; --border:#e8e8e8; --hover:#f4f4f4; --subtle:#fafafa;
+    --selected:#171717; --on-selected:#fff; --ground:#f1f4f2; --c-line:#c7cec9;
+    --green:#377a53; --green-fill:#cee7d7; --blue:#426c9c; --blue-fill:#d7e5f5; --red:#b33f3f; --red-fill:#f0d6d6; --gray-fill:#e5e8e6;
+    --amber:#a8742c; --amber-fill:#f3e4cc;
+    --shadow:0 3px 16px #00000008;
+    /* legacy semantic names used by the chart / site code */
+    --panel:var(--surface); --line:var(--border); --dim:var(--muted);
+    --accent:#171717; --good:var(--green); --bad:var(--red); --scen:var(--blue);
+    --sell:#377a53; --store:#426c9c; --dry:#8a918d; --tower:#b33f3f; --water:#3f8fa8;
+    --sans: Inter, Geist, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --code: ui-monospace, SFMono-Regular, Menlo, monospace; --mono: var(--sans);
+  }
+  * { box-sizing:border-box; }
+  html { background:var(--bg); }
+  body { margin:0; color:var(--ink); font:13.5px/1.5 var(--sans); background:var(--bg); -webkit-font-smoothing:antialiased; font-feature-settings:"cv11","ss01"; }
+  button, select, input { font-family:inherit; color:inherit; }
+  svg.i { width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; flex:none; }
+  .wrap { max-width:1200px; margin:0 auto; padding:0 24px; }
+
+  /* header */
+  header { background:rgba(255,255,255,.88); backdrop-filter:blur(10px); border-bottom:1px solid var(--border); position:sticky; top:0; z-index:20; }
+  header .wrap { display:flex; align-items:center; gap:14px; padding-top:14px; padding-bottom:14px; flex-wrap:wrap; }
+  .heading { display:flex; gap:11px; align-items:center; min-width:0; }
+  .emblem { width:34px; height:34px; border:1px solid var(--border); border-radius:9px; display:grid; place-items:center; background:var(--subtle); flex:none; color:var(--green); }
+  .emblem svg.i { width:17px; height:17px; }
+  .heading h1 { font-size:15px; font-weight:500; letter-spacing:-.3px; line-height:1.3; margin:0; }
+  .heading p { font-size:12px; line-height:1.4; color:var(--muted); margin:2px 0 0; }
+  .tools { margin-left:auto; display:flex; align-items:center; gap:10px; min-width:0; }
+  .select { position:relative; display:inline-flex; align-items:center; min-width:0; }
+  .select select { appearance:none; -webkit-appearance:none; background:var(--surface); border:1px solid var(--border); border-radius:7px; height:32px; padding:0 28px 0 10px; font-size:12px; color:var(--ink); cursor:pointer; text-transform:capitalize; max-width:200px; }
+  .select select:hover { background:var(--hover); }
+  .select select:focus-visible { outline:2px solid var(--ink); outline-offset:1px; }
+  .select > svg.i { position:absolute; right:9px; width:12px; height:12px; pointer-events:none; color:var(--muted); }
+  .api { display:inline-flex; align-items:center; gap:7px; height:32px; padding:0 10px; border:1px solid var(--border); border-radius:7px; font-size:11.5px; color:var(--muted); background:var(--surface); white-space:nowrap; max-width:220px; overflow:hidden; text-overflow:ellipsis; }
+  .dot { width:7px; height:7px; border-radius:50%; background:var(--red); display:inline-block; flex:none; }
+  .dot.ok { background:#3fa66a; box-shadow:0 0 0 3px #3fa66a22; }
+
+  /* tabs (segmented, like .bp-switch) */
+  .tabbar { padding:18px 0 4px; }
+  .switch { display:inline-flex; padding:3px; background:var(--surface); border:1px solid var(--border); border-radius:9px; gap:2px; max-width:100%; overflow-x:auto; scrollbar-width:none; box-shadow:var(--shadow); }
+  .switch::-webkit-scrollbar { display:none; }
+  .switch button { display:flex; align-items:center; gap:6px; border:0; background:transparent; border-radius:6px; height:30px; padding:0 11px; font-size:12.5px; color:var(--muted); cursor:pointer; white-space:nowrap; transition:background .15s, color .15s; }
+  .switch button:hover { background:var(--hover); color:var(--ink); }
+  .switch button[aria-pressed=true], .switch button[aria-pressed=true]:hover { background:var(--selected); color:var(--on-selected); }
+  .switch.sm { box-shadow:none; border-radius:8px; }
+  .switch.sm button { height:25px; padding:0 8px; font-size:11.5px; border-radius:5px; }
+
+  main { padding:14px 0 64px; }
+  main > section { display:none; }
+  main > section.on { display:block; animation:fade .25s ease; }
+  @keyframes fade { from { opacity:0; transform:translateY(3px); } to { opacity:1; transform:none; } }
+  h2 { font-size:15px; font-weight:500; letter-spacing:-.3px; margin:34px 0 4px; }
+  h2 + .lede { margin:0 0 14px; }
+  .lede { color:var(--muted); font-size:13px; margin:0 0 14px; }
+  section > h2:first-child { margin-top:10px; }
+
+  /* cards */
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow); padding:20px 22px; position:relative; }
+  .card.flush { padding:0; overflow:hidden; }
+  .card-title { font-size:13px; font-weight:500; letter-spacing:-.2px; margin:0 0 10px; display:flex; align-items:center; gap:8px; }
+  .card-title .muted { font-weight:400; }
+  .muted { color:var(--muted); }
+
+  /* stats (like .bp-stats) */
+  .stats { display:grid; grid-template-columns:repeat(var(--n,3), minmax(0,1fr)); gap:12px; }
+  .stats > div { display:flex; flex-direction:column; min-width:0; }
+  .stats > div + div { padding-left:22px; border-left:1px solid var(--border); }
+  .stats .cap { color:var(--muted); font-size:12px; }
+  .stats strong { font-size:28px; line-height:1.3; font-weight:500; letter-spacing:-.8px; margin:3px 0 2px; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .stats strong em { font-size:14px; font-style:normal; font-weight:400; letter-spacing:0; color:var(--muted); margin-left:3px; }
+  .stats small { font-size:11px; color:var(--muted); }
+
+  /* report metrics */
+  .metrics { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); }
+  .metric { padding:22px 24px; display:flex; flex-direction:column; min-width:0; }
+  .metric + .metric { border-left:1px solid var(--border); }
+  .metric .name { font-size:12px; color:var(--muted); display:flex; align-items:center; gap:8px; }
+  .metric .name b { color:var(--ink); font-weight:500; font-size:13px; }
+  .metric .value { font-size:40px; font-weight:500; letter-spacing:-1.4px; margin:6px 0 0; font-variant-numeric:tabular-nums; line-height:1.1; }
+  .metric .unit { font-size:11.5px; color:var(--muted); margin-top:4px; }
+  .metric .meaning { margin-top:12px; font-size:12.5px; color:var(--muted); line-height:1.55; flex:1; }
+  .query { margin-top:12px; font:11px/1.55 var(--code); color:#555; background:var(--subtle); border:1px solid var(--border); border-radius:8px; padding:9px 11px; white-space:pre-wrap; word-break:break-word; }
+  .badge { display:inline-flex; align-items:center; gap:5px; height:20px; padding:0 7px; border-radius:999px; font-size:10.5px; font-weight:500; background:var(--gray-fill); color:var(--muted); white-space:nowrap; }
+  .badge.live { background:var(--green-fill); color:var(--green); }
+  .badge.live::before { content:""; width:5px; height:5px; border-radius:50%; background:currentColor; }
+
+  /* status lines */
+  .status { color:var(--muted); font-size:12px; margin-top:12px; line-height:1.5; }
+  .status code, .err code { font:11px var(--code); background:var(--subtle); border:1px solid var(--border); border-radius:5px; padding:1px 5px; }
+  .err { color:var(--red); }
+
+  /* buttons + inputs */
+  .btn { display:inline-flex; align-items:center; justify-content:center; gap:6px; height:34px; padding:0 14px; border-radius:7px; border:1px solid var(--selected); background:var(--selected); color:var(--on-selected); font-size:12.5px; font-weight:500; cursor:pointer; white-space:nowrap; transition:opacity .15s, background .15s; }
+  .btn:hover { opacity:.88; }
+  .btn.secondary { background:var(--surface); color:var(--ink); border-color:var(--border); }
+  .btn.secondary:hover { background:var(--hover); opacity:1; }
+  .btn[disabled] { opacity:.45; cursor:wait; }
+  .btn svg.i { width:13px; height:13px; }
+  form { display:flex; gap:10px; }
+  input[type=text] { flex:1; min-width:0; background:var(--surface); border:1px solid var(--border); border-radius:10px; color:var(--ink); padding:0 16px; height:48px; font-size:15px; transition:border-color .15s, box-shadow .15s; }
+  input[type=text]::placeholder { color:#a3a3a3; }
+  input[type=text]:focus { outline:none; border-color:#bdbdbd; box-shadow:0 0 0 4px #0000000a; }
+  #ask-form .btn { height:48px; padding:0 20px; border-radius:10px; font-size:13.5px; }
+
+  /* ask */
+  .ask-card { padding:26px 28px; }
+  .examples { margin-top:14px; display:flex; flex-wrap:wrap; gap:8px; }
+  .examples button { background:var(--surface); border:1px solid var(--border); color:var(--muted); height:30px; padding:0 12px; border-radius:999px; font-size:12px; cursor:pointer; transition:background .15s, color .15s; }
+  .examples button:hover { background:var(--hover); color:var(--ink); }
+  .answer { margin-top:24px; font-size:18px; line-height:1.55; color:var(--ink); letter-spacing:-.2px; }
+  .answer:empty { display:none; }
+  .answer b { color:var(--ink); font-weight:600; }
+  .answer code { font:.78em var(--code); color:#444; background:var(--subtle); border:1px solid var(--border); border-radius:5px; padding:1px 5px; }
+
+  /* tables */
+  .table-wrap { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th, td { text-align:left; padding:10px 12px; border-bottom:1px solid var(--border); vertical-align:top; }
+  th { font-size:12px; color:var(--muted); font-weight:400; white-space:nowrap; }
+  tbody tr { transition:background .12s; }
+  tbody tr:hover { background:var(--hover); }
+  tbody tr:last-child td { border-bottom:0; }
+  td.n, th.n { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  td.q { font-family:var(--code); font-size:11.5px; color:var(--muted); }
+  .card.flush table th:first-child, .card.flush table td:first-child { padding-left:22px; }
+  .card.flush table th:last-child, .card.flush table td:last-child { padding-right:22px; }
+  .card.flush .status { margin:0; padding:12px 22px 16px; border-top:1px solid var(--border); }
+  .pill { display:inline-flex; align-items:center; height:22px; padding:0 9px; border-radius:999px; font-size:11.5px; font-weight:500; background:var(--gray-fill); color:var(--muted); white-space:nowrap; }
+  .pill.good, .pill.rec { background:var(--green-fill); color:var(--green); }
+  .pill.carbon { background:var(--blue-fill); color:var(--blue); }
+  .pill.bad { background:var(--red-fill); color:var(--red); }
+  .pos { color:var(--red); } .neg { color:var(--green); }
+
+  /* charts */
+  .chart { width:100%; height:auto; display:block; }
+  .chart text { font-family:var(--sans); }
+  .legend { display:flex; gap:16px; flex-wrap:wrap; font-size:12px; color:var(--muted); margin-top:10px; }
+  .legend i, .keys i { display:inline-block; width:8px; height:8px; border-radius:2px; margin-right:6px; vertical-align:0; }
+
+  /* site */
+  .bento { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:16px; }
+  .scene-wrap { position:relative; overflow:hidden; background:#f6f7f6; border:1px solid var(--border); border-radius:14px; box-shadow:var(--shadow); }
+  #scene { width:100%; height:580px; display:block; }
+  .hud { position:absolute; left:14px; right:14px; bottom:14px; display:flex; flex-direction:column; gap:8px; pointer-events:none; }
+  .hud-row { display:flex; gap:10px; align-items:center; pointer-events:auto; background:rgba(255,255,255,.92); backdrop-filter:blur(8px); border:1px solid var(--border); border-radius:11px; padding:7px 10px; box-shadow:var(--shadow); }
+  .hud-row .btn { height:30px; padding:0 12px; }
+  .hud-row input[type=range] { flex:1; accent-color:#171717; }
+  .hud-row > span { font-size:12px; color:var(--ink); min-width:52px; text-align:right; font-variant-numeric:tabular-nums; font-weight:500; }
+  .hud-row .select select { height:30px; font-size:11.5px; padding:0 24px 0 9px; }
+  .hud-stats { display:none; }
+  .cams { position:absolute; top:12px; right:14px; z-index:3; }
+  .cams .switch { box-shadow:var(--shadow); background:rgba(255,255,255,.92); backdrop-filter:blur(8px); }
+  .cams button.on { background:var(--selected); color:var(--on-selected); }
+  .scrub { flex:1; position:relative; min-width:0; }
+  .scrub input[type=range] { width:100%; margin:0; display:block; }
+  .strip { display:flex; height:3px; margin-top:3px; border-radius:2px; overflow:hidden; }
+  .strip i { flex:1; background:transparent; }
+  .strip i.sc { background:var(--blue); }
+  .labels { position:absolute; inset:0; pointer-events:none; overflow:hidden; }
+  .lbl { position:absolute; left:0; top:0; font:500 11px/1.3 var(--sans); color:var(--ink); background:#fff; border:1px solid var(--border); border-radius:999px; padding:4px 9px; white-space:nowrap; box-shadow:0 2px 10px #0000000d; transition:opacity .2s; }
+  .lbl.scen { color:var(--blue); border-color:#c5d6ea; background:#f5f9fd; }
+  .lbl.small { font-size:10px; font-weight:400; padding:2px 7px; color:var(--muted); box-shadow:0 1px 4px #00000008; }
+  .lbl.tip3d { font-size:12px; font-weight:400; border-radius:8px; padding:6px 10px; z-index:2; box-shadow:0 6px 20px #00000014; }
+  .keys { position:absolute; top:12px; left:14px; display:flex; gap:12px; flex-wrap:wrap; font-size:11.5px; color:var(--muted); background:rgba(255,255,255,.92); backdrop-filter:blur(8px); border:1px solid var(--border); border-radius:9px; padding:6px 10px; box-shadow:var(--shadow); max-width:calc(100% - 330px); }
+  .side { display:flex; flex-direction:column; gap:16px; }
+  .side .card { padding:16px 18px; }
+  .today .cap { font-size:12px; color:var(--muted); }
+  .today .value { font-size:34px; font-weight:500; letter-spacing:-1.1px; line-height:1.15; margin-top:4px; font-variant-numeric:tabular-nums; }
+  .today .unit { margin-top:6px; }
+  .card.hot { border-color:#c5d6ea; background:linear-gradient(#f7fafd, #fff); }
+  .card.hot .unit .pill { background:var(--blue-fill); color:var(--blue); }
+  .kv { display:flex; justify-content:space-between; align-items:baseline; padding:8px 0; border-bottom:1px solid var(--border); gap:10px; }
+  .kv:last-child { border-bottom:0; }
+  .kv .k { font-size:12.5px; color:var(--muted); display:flex; align-items:center; gap:7px; }
+  .kv .k i { width:7px; height:7px; border-radius:2px; display:inline-block; }
+  .kv .v { font-weight:500; font-size:19px; font-variant-numeric:tabular-nums; letter-spacing:-.5px; }
+  .kv .v small { font-size:11px; color:var(--muted); margin-left:4px; font-weight:400; letter-spacing:0; }
+  .bar { height:4px; background:var(--gray-fill); border-radius:99px; margin:2px 0 6px; overflow:hidden; }
+  .bar i { display:block; height:100%; background:var(--green); width:0; border-radius:99px; transition:width .25s; }
+
+  /* skyline */
+  .sky-bar { display:flex; gap:10px; align-items:center; margin-bottom:12px; font-size:12px; color:var(--muted); }
+  .sky-root { --color-background:#fff; --color-foreground:#171717; --color-border:#e8e8e8; --color-muted-foreground:#686868; background:#fff; color:#171717; font-family:var(--sans); }
+  .sky-root section { border-radius:12px !important; }
+
+  /* pipeline */
+  .pipe-wrap { max-width:760px; margin:0 auto; }
+  .pipe-wrap .lede { text-align:center; margin:10px 0 18px; }
+
+  /* design */
+  .stations-card { padding:22px 22px 18px; }
+  .stations { position:relative; display:grid; grid-template-columns:repeat(var(--n,5), minmax(0,1fr)); gap:8px; }
+  .stations::before { content:""; position:absolute; left:10%; right:10%; top:96px; border-top:1.2px dashed var(--c-line); z-index:0; }
+  .station { position:relative; z-index:1; border:0; background:transparent; padding:0 4px 8px; border-radius:10px; cursor:pointer; text-align:center; display:flex; flex-direction:column; align-items:center; min-width:0; transition:background .15s; }
+  .station:hover { background:var(--subtle); }
+  .station:focus-visible { outline:2px solid var(--ink); outline-offset:2px; }
+  .station svg.block { width:120px; height:116px; overflow:visible; }
+  .station svg.block g { transition:transform .2s ease, filter .2s ease; }
+  .station[aria-pressed=true] svg.block g { transform:translateY(-5px); filter:drop-shadow(0 8px 10px rgba(0,0,0,.14)); }
+  .station[data-v=rec] { --top:var(--green-fill); } .station[data-v=no] { --top:var(--gray-fill); } .station[data-v=carbon] { --top:var(--blue-fill); }
+  .station .roof { fill:var(--top); } .station .left { fill:color-mix(in srgb, var(--top) 89%, var(--ink) 11%); } .station .right { fill:color-mix(in srgb, var(--top) 75%, var(--ink) 25%); }
+  .station strong { font-size:12px; font-weight:500; line-height:17px; margin-top:6px; max-width:150px; }
+  .station .vd { font-size:11px; color:var(--muted); line-height:17px; display:flex; align-items:center; gap:5px; justify-content:center; }
+  .station .vd::before { content:""; width:6px; height:6px; border-radius:50%; background:var(--muted); }
+  .station[data-v=rec] .vd::before { background:var(--green); } .station[data-v=carbon] .vd::before { background:var(--blue); }
+  .station .npv { font-size:11.5px; font-variant-numeric:tabular-nums; margin-top:1px; }
+  .station .gwh { font-size:10.5px; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .detail { margin-top:16px; border-top:1px solid var(--border); padding-top:16px; display:grid; grid-template-columns:minmax(0,1.3fr) minmax(0,1fr); gap:24px; }
+  .detail h3 { margin:0 0 6px; font-size:14px; font-weight:500; letter-spacing:-.2px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .detail p { margin:0; color:var(--muted); font-size:13px; line-height:1.6; }
+  .detail .kv .v { font-size:15px; }
+  .grid2 { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:16px; align-items:start; }
+  .recs { list-style:none; margin:0; padding:0; counter-reset:r; }
+  .recs li { counter-increment:r; display:grid; grid-template-columns:24px minmax(0,1fr); gap:12px; padding:11px 0; border-bottom:1px solid var(--border); font-size:13px; line-height:1.6; }
+  .recs li:last-child { border-bottom:0; }
+  .recs li::before { content:counter(r); width:22px; height:22px; border-radius:7px; border:1px solid var(--border); background:var(--subtle); display:grid; place-items:center; font-size:11px; font-weight:500; color:var(--muted); margin-top:1px; }
+  .recs li.note::before { content:"–"; }
+  .rec-lead { font-size:15px; line-height:1.55; letter-spacing:-.2px; margin:0 0 6px; }
+  .skeleton { height:14px; border-radius:6px; background:linear-gradient(90deg, #f1f1f1, #f8f8f8, #f1f1f1); background-size:200% 100%; animation:sh 1.2s linear infinite; margin:10px 0; }
+  @keyframes sh { to { background-position:-200% 0; } }
+
+  @media (max-width: 980px) {
+    .bento { grid-template-columns:1fr; }
+    .side { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); }
+    .metrics { grid-template-columns:1fr; }
+    .metric + .metric { border-left:0; border-top:1px solid var(--border); }
+    .grid2, .detail { grid-template-columns:1fr; }
+    .keys { max-width:calc(100% - 28px); top:auto; bottom:72px; }
+  }
+  @media (max-width: 560px) {
+    .wrap { padding:0 16px; }
+    header .wrap { gap:10px; }
+    .tools { margin-left:0; width:100%; }
+    .api { margin-left:auto; max-width:150px; }
+    #scene { height:440px; }
+    .side { grid-template-columns:1fr; }
+    .stats { grid-template-columns:repeat(2, minmax(0,1fr)); row-gap:16px; }
+    .stats > div:nth-child(odd) { padding-left:0; border-left:0; }
+    .stats strong { font-size:22px; }
+    .metric .value { font-size:32px; }
+    .stations { grid-template-columns:repeat(2, minmax(0,1fr)); }
+    .stations::before { display:none; }
+    .card { padding:16px; }
+    .ask-card { padding:18px; }
+    form { flex-direction:column; }
+    .keys { display:none; }
+    .cams { left:14px; right:auto; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="heading">
+      <span class="emblem"><svg class="i" viewBox="0 0 24 24"><path d="m8 3 4 8 5-5 5 15H2L8 3z"/></svg></span>
+      <div><h1>Alpine</h1><p>The thermal layer · Lake Hawkeye, Lansing NY · 100 MW IT</p></div>
+    </div>
+    <div class="tools">
+      <label class="select" title="Scenario"><span class="muted" style="font-size:12px;margin-right:8px">Scenario</span><select id="scenario" aria-label="Scenario"></select><svg class="i" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></label>
+      <span class="api" title="API"><span class="dot" id="dot"></span><span id="api-label">api</span></span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="tabbar">
+    <nav class="switch" role="tablist" aria-label="Sections">
+      <button aria-pressed="true" data-tab="site"><svg class="i" viewBox="0 0 24 24"><path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z"/><path d="M15 5.764v15"/><path d="M9 3.236v15"/></svg>Site</button>
+      <button aria-pressed="false" data-tab="report"><svg class="i" viewBox="0 0 24 24"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>Report</button>
+      <button aria-pressed="false" data-tab="pipeline"><svg class="i" viewBox="0 0 24 24"><line x1="6" x2="6" y1="3" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>Pipeline</button>
+      <button aria-pressed="false" data-tab="design"><svg class="i" viewBox="0 0 24 24"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>Design</button>
+      <button aria-pressed="false" data-tab="ask"><svg class="i" viewBox="0 0 24 24"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>Ask</button>
+      <button aria-pressed="false" data-tab="decisions"><svg class="i" viewBox="0 0 24 24"><path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/></svg>Decisions</button>
+      <button aria-pressed="false" data-tab="model"><svg class="i" viewBox="0 0 24 24"><line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/></svg>Model</button>
+    </nav>
+  </div>
+
+<main>
+  <section id="site" class="on">
+    <div class="bento">
+      <div class="scene-wrap">
+        <canvas id="scene"></canvas>
+        <div class="hud">
+          <div class="hud-row">
+            <button class="btn" id="play">Play</button>
+            <label class="select"><select id="speed" title="play speed" aria-label="Play speed"><option value="1">1x</option><option value="2">2x</option><option value="4">4x</option></select><svg class="i" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></label>
+            <div class="scrub"><input type="range" id="day" min="0" max="364" value="0" aria-label="Day of year"><div class="strip" id="scen-strip"></div></div>
+            <span id="day-label">Jan 1</span>
+          </div>
+          <div class="hud-stats" id="hud-stats"></div>
+        </div>
+        <div class="cams"><div class="switch sm"><button data-cam="overview" class="on">Overview</button><button data-cam="network">Network</button><button data-cam="towers">Towers</button><button data-cam="pit">Pit</button></div></div>
+        <div class="keys">
+          <span><i style="background:var(--sell)"></i>To network</span>
+          <span><i style="background:var(--store)"></i>Pit</span>
+          <span><i style="background:var(--dry)"></i>Dry</span>
+          <span><i style="background:var(--tower)"></i>Towers · plume = water</span>
+        </div>
+      </div>
+      <div class="side" id="side">
+        <div class="card today">
+          <div class="cap">Today</div><div class="value" id="s-day">—</div><div class="unit"><span class="pill" id="s-scen">normal</span></div>
+        </div>
+        <div class="card">
+          <div class="kv"><span class="k">Heat captured</span><span class="v" id="s-heat">—<small>MW</small></span></div>
+          <div class="kv"><span class="k"><i style="background:var(--sell)"></i>To network</span><span class="v" id="s-sell">—<small>MW</small></span></div>
+          <div class="kv"><span class="k"><i style="background:var(--dry)"></i>Dry coolers</span><span class="v" id="s-dry">—<small>MW</small></span></div>
+          <div class="kv"><span class="k"><i style="background:var(--tower)"></i>Towers</span><span class="v" id="s-tower">—<small>MW</small></span></div>
+        </div>
+        <div class="card">
+          <div class="kv"><span class="k">Water today</span><span class="v" id="s-water">—<small>gal</small></span></div>
+          <div class="bar"><i id="s-water-bar" style="background:var(--water)"></i></div>
+          <div class="kv" style="margin-top:6px"><span class="k">Pit level</span><span class="v" id="s-pit">—<small>%</small></span></div>
+          <div class="bar"><i id="s-pit-bar" style="background:var(--store)"></i></div>
+          <div class="kv" style="margin-top:6px"><span class="k">Net cost</span><span class="v" id="s-cost">—<small>/day</small></span></div>
+        </div>
+      </div>
+    </div>
+    <div class="status" id="site-status">Loading the year…</div>
+  </section>
+
+  <section id="report">
+    <div class="card flush"><div class="metrics" id="metrics"></div></div>
+    <div class="status" id="report-status">Loading…</div>
+
+    <h2>The year as a skyline</h2>
+    <p class="lede">One block per day.</p>
+    <div class="card">
+      <div class="sky-bar">
+        <span>Metric</span>
+        <label class="select"><select id="sky-metric" aria-label="Skyline metric" style="text-transform:none"><option value="heat_exported_mw">Heat sold (MWh)</option><option value="water_gal">Water (gal)</option><option value="heat_tower_mw">Towers (MWh)</option><option value="cost_usd">Net cost ($)</option></select><svg class="i" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></label>
+      </div>
+      <div id="sky-root" class="sky-root"></div>
+    </div>
+
+    <h2>Day by day</h2>
+    <p class="lede">Where the heat went, and the water it cost.</p>
+    <div class="card">
+      <svg id="daily" class="chart" viewBox="0 0 960 300" role="img" aria-label="Daily heat split and water use"></svg>
+      <div class="legend">
+        <span><i style="background:var(--sell)"></i>Sold to the network</span>
+        <span><i style="background:var(--store)"></i>Stored</span>
+        <span><i style="background:var(--dry)"></i>Rejected, dry</span>
+        <span><i style="background:var(--tower)"></i>Rejected, towers</span>
+        <span><i style="background:var(--water)"></i>Water, gal/day (line, right axis)</span>
+      </div>
+      <div class="status" id="daily-status"></div>
+    </div>
+
+    <h2>The agent's lever</h2>
+    <p class="lede">Towers vs. dry condensers on the chillers, same year.</p>
+    <div class="card flush">
+      <div class="table-wrap"><table><thead><tr><th>Metric</th><th class="n">Towers (default)</th><th class="n">Dry condensers</th><th class="n">Change</th></tr></thead>
+        <tbody id="compare-body"></tbody></table></div>
+      <div class="status" id="compare-status">Loading…</div>
+    </div>
+  </section>
+
+  <section id="pipeline">
+    <div class="pipe-wrap">
+      <p class="lede">Every run: simulate the year, stream it to Keewano, let the agent decide, report live.</p>
+      <div id="pipeline-root"></div>
+      <div class="status" id="pipeline-status" style="text-align:center"></div>
+    </div>
+  </section>
+
+  <section id="design">
+    <div id="design-body">
+      <div class="card"><div class="skeleton" style="width:40%"></div><div class="skeleton"></div><div class="skeleton" style="width:70%"></div></div>
+    </div>
+    <div class="status" id="design-status">Designing the heat reuse…</div>
+  </section>
+
+  <section id="ask">
+    <div class="card ask-card">
+      <form id="ask-form">
+        <input type="text" id="q" placeholder="Ask the site anything about this year…" autocomplete="off">
+        <button class="btn" id="go">Ask</button>
+      </form>
+      <div class="examples" id="examples"></div>
+      <div class="answer" id="answer"></div>
+      <div class="query" id="answer-query" style="display:none"></div>
+      <div class="status" id="ask-status"></div>
+    </div>
+  </section>
+
+  <section id="decisions">
+    <div class="card flush">
+      <div class="table-wrap"><table><thead><tr><th>Day</th><th>Asked</th><th>Answer</th><th>Decision</th></tr></thead>
+        <tbody id="decisions-body"></tbody></table></div>
+      <div class="status" id="decisions-status">Loading…</div>
+    </div>
+  </section>
+
+  <section id="model">
+    <h2>Which assumptions move the answer</h2>
+    <p class="lede">±25%, one at a time.</p>
+    <div class="card flush">
+      <div style="padding:16px 22px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:12px; flex-wrap:wrap">
+        <button class="btn" id="sens-go"><svg class="i" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"/></svg>Run sensitivity</button><span class="muted" style="font-size:12px">About 10 s</span>
+      </div>
+      <div class="table-wrap"><table><thead><tr><th>Constant</th><th class="n">Base</th><th class="n">WUE −25%</th><th class="n">WUE +25%</th><th class="n">ERF −25%</th><th class="n">ERF +25%</th><th class="n">Cost −25%</th><th class="n">Cost +25%</th></tr></thead>
+        <tbody id="sens-body"></tbody></table></div>
+      <div class="status" id="sens-status">Every constant marked "assumption - verify" in config/site.yaml is a candidate. Cells show the % change in the year's result.</div>
+    </div>
+  </section>
+</main>
+</div>
+
+<script type="importmap">{"imports":{"three":"./vendor/three.module.min.js"}}</script>
+<script type="module" src="site-light.js"></script>
+<script src="./vendor/skyline-bundle.js" defer></script>
+<script src="skyline.js" defer></script>
+<script src="./vendor/pipeline-bundle.js" defer></script>
+<script>
+const API_BASE = (new URLSearchParams(location.search).get('api')) || window.API_BASE || (location.protocol.startsWith('http') ? location.origin : 'http://localhost:8000');
+document.getElementById('api-label').textContent = API_BASE.replace(/^https?:\/\//, '');
+
+const EXAMPLES = [
+  'What was the PUE for the year?',
+  'How many gallons of water did the site use in the heat wave?',
+  'What share of the heat was reused in January?',
+  'How many hours was the pit empty?',
+  'Which hour had the highest cost, and why?',
+];
+const MEANING = {
+  PUE: 'Total facility energy per unit of IT energy. Lower is better; liquid cooling plus heat export keeps it near 1.1.',
+  WUE: 'Litres of water per IT kWh. The number the town asks about: every hour the chiller condensers run on towers raises it; dry condensers take it to near zero for more electricity.',
+  ERF: 'Share of energy reused as heat. Germany requires 10% from July 2026, 20% by 2028, for new data centers.',
+};
+const RUNS = { byScenario: {}, current: null };
+
+// Tabs
+const opened = new Set(['site']);
+document.querySelectorAll('nav [data-tab]').forEach(b => b.onclick = () => {
+  document.querySelectorAll('nav [data-tab]').forEach(x => x.setAttribute('aria-pressed', x === b ? 'true' : 'false'));
+  document.querySelectorAll('main > section').forEach(s => s.classList.toggle('on', s.id === b.dataset.tab));
+  const tab = b.dataset.tab, first = !opened.has(tab); opened.add(tab);
+  if (tab === 'pipeline' && first) mountPipeline();
+  if (tab === 'design' && first) loadDesign();
+  if (tab === 'site') window.dispatchEvent(new Event('resize'));
+});
+// Camera preset buttons: site.js wires the clicks; mirror the selected state here too.
+document.querySelectorAll('[data-cam]').forEach(b => b.addEventListener('click', () => document.querySelectorAll('[data-cam]').forEach(x => x.classList.toggle('on', x === b))));
+
+async function get(path, opts) {
+  const r = await fetch(API_BASE + path, opts);
+  if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
+  return r.json();
+}
+
+async function init() {
+  try {
+    await get('/health'); document.getElementById('dot').classList.add('ok');
+    const d = await get('/runs');
+    for (const r of d.runs) RUNS.byScenario[r.scenario] = r;      // newest last wins
+    const sel = document.getElementById('scenario');
+    sel.innerHTML = Object.keys(RUNS.byScenario).map(s => `<option value="${s}">${s.replace('_', ' ')}</option>`).join('');
+    sel.value = RUNS.byScenario.normal ? 'normal' : sel.options[0]?.value;
+    sel.onchange = () => selectScenario(sel.value);
+    await selectScenario(sel.value);
+  } catch (e) {
+    document.getElementById('report-status').innerHTML = `<span class="err">API unreachable at ${esc(API_BASE)}: ${esc(e.message)}. Start it with <code>uvicorn server:app --port 8000</code> and run <code>python thermal.py</code> once.</span>`;
+  }
+  loadDecisions();
+}
+
+async function selectScenario(s) {
+  RUNS.current = RUNS.byScenario[s];
+  renderReport(RUNS.current);
+  loadDaily(RUNS.current.run_id);
+  loadCompare(s);
+}
+
+const metricHtml = (m, live, count) => `
+  <div class="metric"><div class="name"><b>${m.name}</b>${live ? '<span class="badge live">Keewano</span>' : '<span class="badge">local run</span>'}</div>
+  <div class="value"${count ? ` data-count="${m.value}"` : ''}>${fmt(m.value)}</div><div class="unit">${m.unit}</div>
+  <div class="meaning">${MEANING[m.name] || ''}</div><div class="query">${esc(m.query)}</div></div>`;
+
+function renderReport(run) {
+  const s = run.summary, el = document.getElementById('metrics');
+  const q = n => `SELECT ${n} FROM events WHERE run_id = '${run.run_id}'`;
+  const metrics = [
+    { name:'PUE', value:s.pue, unit:'facility kWh / IT kWh', query:q('sum(power_kwh) / sum(it_kwh)') },
+    { name:'WUE', value:s.wue_l_per_kwh, unit:'L / IT kWh', query:q('sum(water_gal) * 3.785 / sum(it_kwh)') },
+    { name:'ERF', value:s.erf, unit:'heat reused / energy in', query:q('sum(heat_exported_mw) / (sum(power_kwh) / 1000)') },
+  ];
+  el.innerHTML = metrics.map(m => metricHtml(m, false, true)).join('');
+  countUp(el);
+  document.getElementById('report-status').textContent =
+    `${run.scenario.replace('_',' ')} · ${fmt(s.heat_available_gwh)} GWh captured, ${fmt(s.heat_exported_gwh)} GWh sold, ${fmt(s.water_mgal)} Mgal water, $${fmt(s.cost_musd)}M net cost, ${fmt(s.co2_kt)} kt CO2 · computed ${run.computed_at}`;
+  loadLiveReport(run);
+}
+
+// Overlay the three numbers with the live Keewano result for this run (value + the query Keewano ran).
+// Runs that were never pushed to Keewano keep the local numbers above.
+async function loadLiveReport(run) {
+  try {
+    const d = await get(`/report?run_id=${encodeURIComponent(run.run_id)}`);
+    if (!d.metrics || d.run_id !== run.run_id || d.source !== 'keewano') return;
+    if (RUNS.current?.run_id !== run.run_id) return;
+    if (d.metrics.every(m => m.value == null)) return;   // Keewano answered with no numbers: keep the local ones
+    const el = document.getElementById('metrics');
+    el.innerHTML = d.metrics.map(m => metricHtml(m, true, false)).join('');
+    const st = document.getElementById('report-status');
+    st.textContent += d.cached ? ` · Keewano: cached from the last query (${d.computed_at})` : ` · live from Keewano ${d.computed_at}`;
+  } catch (e) { /* not in Keewano (local-only run) or Keewano unreachable: keep the local numbers */ }
+}
+
+async function loadDaily(run_id) {
+  const svg = document.getElementById('daily'), st = document.getElementById('daily-status');
+  try {
+    const d = await get(`/events?run_id=${encodeURIComponent(run_id)}&daily=1`);
+    drawDaily(svg, d.rows);
+    window.dispatchEvent(new CustomEvent('alpine:daily', { detail: { rows: d.rows, run: RUNS.current } }));
+    const peak = d.rows.reduce((a, r) => r.water_gal > a.water_gal ? r : a, d.rows[0]);
+    st.textContent = `${d.rows.length} days, ${(d.rows.length * 24).toLocaleString()} simulated hours · peak water day ${peak.day} at ${Math.round(peak.water_gal).toLocaleString()} gal`;
+  } catch (e) { st.innerHTML = `<span class="err">${esc(e.message)}</span>`; }
+}
+
+function drawDaily(svg, rows) {
+  const W = 960, H = 300, L = 54, R = 64, T = 12, B = 28, iw = W - L - R, ih = H - T - B;
+  const n = rows.length, bw = iw / n;
+  const heatMax = Math.max(...rows.map(r => r.heat_available_mw));
+  const waterMax = Math.max(1, ...rows.map(r => r.water_gal));
+  const y = v => T + ih - v / heatMax * ih, yw = v => T + ih - v / waterMax * ih;
+  let out = '';
+  [0, .5, 1].forEach(f => out += `<line x1="${L}" x2="${L + iw}" y1="${y(f * heatMax)}" y2="${y(f * heatMax)}" stroke="var(--line)"/>`);
+  rows.forEach((r, i) => {
+    const x = L + i * bw, parts = [['sell', r.heat_exported_mw], ['store', Math.max(0, r.heat_stored_mw)], ['dry', r.dry_mw], ['tower', r.heat_tower_mw]];
+    if (r.scenario !== 'normal') out += `<rect x="${x}" y="${T}" width="${bw}" height="${ih}" fill="var(--scen)" fill-opacity=".08"/>`;
+    let acc = 0;
+    for (const [k, v] of parts) { if (v <= 0) continue; out += `<rect x="${x}" y="${y(acc + v)}" width="${Math.max(bw, .5)}" height="${y(acc) - y(acc + v)}" fill="var(--${k})" fill-opacity=".85"/>`; acc += v; }
+  });
+  out += `<polyline fill="none" stroke="var(--water)" stroke-width="1.5" stroke-linejoin="round" points="${rows.map((r, i) => `${L + i * bw + bw / 2},${yw(r.water_gal)}`).join(' ')}"/>`;
+  const months = ['J','F','M','A','M','J','J','A','S','O','N','D'];
+  months.forEach((m, i) => out += `<text x="${L + (i + .5) * iw / 12}" y="${H - 8}" fill="var(--muted)" font-size="11" text-anchor="middle">${m}</text>`);
+  [0, .5, 1].forEach(f => {
+    out += `<text x="${L - 8}" y="${y(f * heatMax) + 4}" fill="var(--muted)" font-size="11" text-anchor="end">${Math.round(f * heatMax / 24)} MW</text>`;
+    out += `<text x="${L + iw + 8}" y="${yw(f * waterMax) + 4}" fill="var(--water)" font-size="11">${Math.round(f * waterMax / 1000)}k gal</text>`;
+  });
+  svg.innerHTML = out;
+}
+
+async function loadCompare(scenario) {
+  const body = document.getElementById('compare-body'), st = document.getElementById('compare-status');
+  st.textContent = 'Running the year twice…';
+  try {
+    const d = await get(`/compare?scenario=${encodeURIComponent(scenario)}`);
+    const label = { pue:'PUE', wue_l_per_kwh:'WUE (L/kWh)', erf:'ERF', water_mgal:'Water (Mgal/yr)', cost_musd:'Net cost ($M/yr)', co2_kt:'CO2 (kt/yr)', hours_tower:'Hours on towers', share_reused:'Share of heat reused' };
+    body.innerHTML = d.rows.map(r => `<tr><td>${label[r.metric] || r.metric}</td><td class="n">${fmt(r.default)}</td><td class="n">${fmt(r.prefer_dry)}</td>
+      <td class="n ${r.delta_pct > 0.05 ? 'pos' : r.delta_pct < -0.05 ? 'neg' : ''}">${r.delta_pct == null ? '—' : (r.delta_pct > 0 ? '+' : '') + r.delta_pct.toFixed(1) + '%'}</td></tr>`).join('');
+    const w = d.rows.find(r => r.metric === 'water_mgal'), c = d.rows.find(r => r.metric === 'cost_musd');
+    st.textContent = `Dry condensers: ${fmt(w.default - w.prefer_dry)} million gallons less water for $${fmt(c.prefer_dry - c.default)}M more electricity a year. The daily agent decides when that trade is worth it.`;
+  } catch (e) { st.innerHTML = `<span class="err">${esc(e.message)}</span>`; }
+}
+
+document.getElementById('sens-go').onclick = async () => {
+  const body = document.getElementById('sens-body'), st = document.getElementById('sens-status'), b = document.getElementById('sens-go');
+  b.disabled = true; st.textContent = 'Running 15 years of simulation…';
+  try {
+    const d = await get(`/sensitivity?scenario=${encodeURIComponent(RUNS.current?.scenario || 'normal')}`);
+    const pct = v => `<td class="n ${Math.abs(v) < 0.5 ? '' : v > 0 ? 'pos' : 'neg'}">${v > 0 ? '+' : ''}${v.toFixed(1)}%</td>`;
+    body.innerHTML = d.rows.map(r => `<tr><td class="q">${esc(r.knob)}</td><td class="n">${fmt(r.base)}</td>${pct(r.wue_low_pct)}${pct(r.wue_high_pct)}${pct(r.erf_low_pct)}${pct(r.erf_high_pct)}${pct(r.cost_low_pct)}${pct(r.cost_high_pct)}</tr>`).join('');
+    st.textContent = 'Read across a row: a big swing means that constant needs a real quote or a meter before anyone relies on the number.';
+  } catch (e) { st.innerHTML = `<span class="err">${esc(e.message)}</span>`; }
+  b.disabled = false;
+};
+
+async function loadDecisions() {
+  const body = document.getElementById('decisions-body'), st = document.getElementById('decisions-status');
+  try {
+    const d = await get('/decisions');
+    body.innerHTML = d.decisions.map(x => `<tr><td class="n" style="text-align:left">${x.day}</td><td class="q">${esc(x.question)}</td><td>${esc(x.answer)}</td>
+      <td><span class="pill ${x.changed ? 'good' : ''}">${esc(x.decision)}</span></td></tr>`).join('');
+    st.textContent = d.decisions.length ? `${d.decisions.length} daily decisions` : 'No decisions yet. Run agent.py.';
+  } catch (e) { st.innerHTML = `<span class="err">Decisions unavailable: ${esc(e.message)}</span>`; }
+}
+
+document.getElementById('examples').innerHTML = EXAMPLES.map(q => `<button type="button">${esc(q)}</button>`).join('');
+document.querySelectorAll('#examples button').forEach(b => b.onclick = () => { document.getElementById('q').value = b.textContent; ask(); });
+document.getElementById('ask-form').onsubmit = e => { e.preventDefault(); ask(); };
+
+async function ask() {
+  const q = document.getElementById('q').value.trim(); if (!q) return;
+  const go = document.getElementById('go'), ans = document.getElementById('answer'), qq = document.getElementById('answer-query'), st = document.getElementById('ask-status');
+  go.disabled = true; ans.textContent = ''; qq.style.display = 'none'; st.textContent = 'Asking Keewano…';
+  const t0 = performance.now();
+  try {
+    const d = await get('/ask', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ question: q }) });
+    ans.innerHTML = md(d.answer); qq.textContent = d.query; qq.style.display = 'block';
+    const nrows = Array.isArray(d.rows) ? d.rows.length : d.rows;
+    st.textContent = `${((performance.now() - t0) / 1000).toFixed(1)} s${nrows != null ? ' · ' + nrows + ' rows' : ''}`;
+  } catch (e) { st.innerHTML = `<span class="err">${esc(e.message)}</span>`; }
+  go.disabled = false;
+}
+
+// Pipeline tab: the BuildPipeline bundle renders and fetches its own data.
+let pipelineMounted = false;
+function mountPipeline(tries = 0) {
+  if (pipelineMounted) return;
+  const st = document.getElementById('pipeline-status');
+  if (typeof window.mountAlpinePipeline === 'function') {
+    try { window.mountAlpinePipeline(document.getElementById('pipeline-root'), { apiBase: API_BASE }); pipelineMounted = true; st.textContent = ''; }
+    catch (e) { st.innerHTML = `<span class="err">Pipeline failed to render: ${esc(e.message)}</span>`; }
+  } else if (tries < 20) { st.textContent = 'Loading the pipeline…'; setTimeout(() => mountPipeline(tries + 1), 250); }
+  else st.innerHTML = '<span class="err">Pipeline bundle not available (vendor/pipeline-bundle.js).</span>';
+}
+
+// Design tab: GET /design -> stats, isometric pathway stations, recommendation, tables, monthly bars.
+const VERDICT = v => v === 'recommend' ? 'rec' : v === 'only with a carbon price' ? 'carbon' : 'no';
+const VLABEL = { rec: 'Recommend', carbon: 'Only with a carbon price', no: 'Not recommended' };
+const usd = v => v == null ? '—' : (v < 0 ? '−' : '') + '$' + (Math.abs(v) >= 1e6 ? (Math.abs(v) / 1e6).toFixed(1) + 'M' : Math.abs(v) >= 1e3 ? Math.round(Math.abs(v) / 1e3) + 'k' : Math.round(Math.abs(v)));
+const num = (v, d = 0) => v == null ? '—' : Number(v).toLocaleString(undefined, { maximumFractionDigits: d, minimumFractionDigits: d });
+const ptsStr = vs => vs.map(p => p.map(v => v.toFixed(2)).join(',')).join(' ');
+let DESIGN = null;
+
+async function loadDesign() {
+  const body = document.getElementById('design-body'), st = document.getElementById('design-status');
+  st.textContent = 'Designing the heat reuse (about 2 s)…';
+  try {
+    DESIGN = await get('/design');
+    renderDesign(DESIGN);
+    st.textContent = `Computed ${DESIGN.computed_at || ''} · ${DESIGN.assumptions || ''}`;
+  } catch (e) {
+    body.innerHTML = `<div class="card"><p class="err" style="margin:0">Design unavailable: ${esc(e.message)}</p><button class="btn secondary" style="margin-top:12px" id="design-retry">Try again</button></div>`;
+    st.textContent = '';
+    document.getElementById('design-retry').onclick = () => { body.innerHTML = '<div class="card"><div class="skeleton" style="width:40%"></div><div class="skeleton"></div></div>'; loadDesign(); };
+  }
+}
+
+function blockSvg(gwh, maxGwh) {
+  const x = 60, y = 96, h = 6 + 58 * (maxGwh > 0 ? gwh / maxGwh : 0);
+  const base = [[x, y - 18], [x + 28, y - 4], [x, y + 10], [x - 28, y - 4]], roof = base.map(([px, py]) => [px, py - h]);
+  return `<svg class="block" viewBox="0 0 120 116" aria-hidden="true"><g>
+    <polygon points="${ptsStr(base.map(([a, b]) => [a, b + 5]))}" fill="var(--ground)"/>
+    <polygon class="left" points="${ptsStr([roof[3], roof[2], base[2], base[3]])}"/>
+    <polygon class="right" points="${ptsStr([roof[1], roof[2], base[2], base[1]])}"/>
+    <polygon class="roof" points="${ptsStr(roof)}"/></g></svg>`;
+}
+
+function renderDesign(d) {
+  const s = d.summary || {}, P = d.pathways || [];
+  const maxG = Math.max(0, ...P.map(p => (p.delivered_mwh || 0) / 1000));
+  const nb = d.network?.best_candidate, be = d.network_breakeven || {}, tr = d.trucked || {};
+  const recs = d.recommendation || [];
+  const lead = recs[0] || '', rest = recs.slice(1);
+  const body = document.getElementById('design-body');
+  body.innerHTML = `
+    <div class="card"><div class="stats" style="--n:4">
+      <div><span class="cap">Heat available</span><strong>${num(s.heat_available_gwh)}<em>GWh/yr</em></strong><small>captured at the site</small></div>
+      <div><span class="cap">Reused</span><strong>${num((s.share_reused || 0) * 100)}<em>%</em></strong><small>${num(s.heat_reused_gwh)} GWh/yr to users</small></div>
+      <div><span class="cap">NPV, recommended</span><strong>${usd(s.npv_recommended_usd)}</strong><small>20-year, combined</small></div>
+      <div><span class="cap">CO2 avoided</span><strong>${num(s.co2_avoided_t)}<em>t/yr</em></strong><small>by the recommended pathways</small></div>
+    </div></div>
+
+    <h2>Pathways</h2>
+    <p class="lede">Block height is heat delivered. Click a block for its detail.</p>
+    <div class="card stations-card">
+      <div class="stations" style="--n:${P.length}">
+        ${P.map((p, i) => { const v = VERDICT(p.verdict); return `<button type="button" class="station" data-i="${i}" data-v="${v}" aria-pressed="false">
+          ${blockSvg((p.delivered_mwh || 0) / 1000, maxG)}
+          <strong>${esc(p.label)}</strong><span class="vd">${VLABEL[v]}</span>
+          <span class="npv">NPV ${usd(p.npv_usd)}</span><span class="gwh">${num((p.delivered_mwh || 0) / 1000, 1)} GWh/yr</span></button>`; }).join('')}
+      </div>
+      <div class="detail" id="pw-detail"></div>
+    </div>
+
+    <h2>Recommendation</h2>
+    <p class="lede">In plain English, from data/customers.csv and config/design.yaml.</p>
+    <div class="card">
+      <p class="rec-lead">${esc(lead)}</p>
+      <ol class="recs">${rest.map(l => { const m = l.match(/^\d+\.\s+(.*)$/s); return `<li class="${m ? '' : 'note'}">${esc(m ? m[1] : l)}</li>`; }).join('')}</ol>
+    </div>
+
+    <div class="grid2" style="margin-top:16px">
+      <div class="card">
+        <div class="card-title">Storage pit <span class="pill rec">${esc(d.pit?.recommend || '—')}</span></div>
+        <p class="muted" style="margin:0;font-size:13px;line-height:1.6">${esc(d.pit?.why || '')}</p>
+      </div>
+      <div class="card">
+        <div class="card-title">Best district network found ${nb ? `<span class="pill ${nb.npv_usd > 0 ? 'rec' : be.pays_with_carbon_price ? 'carbon' : 'no'}">${nb.npv_usd > 0 ? 'Pays' : be.pays_with_carbon_price ? 'Only with a carbon price' : 'Does not pay'}</span>` : ''}</div>
+        ${nb ? `<div class="kv"><span class="k">Buildings</span><span class="v">${num(nb.buildings)}<small>${num(nb.homes)} homes · ${num(nb.schools)} schools</small></span></div>
+        <div class="kv"><span class="k">Pipe</span><span class="v">${num(nb.pipe_km, 1)}<small>km</small></span></div>
+        <div class="kv"><span class="k">Heat delivered</span><span class="v">${num(nb.delivered_mwh)}<small>MWh/yr</small></span></div>
+        <div class="kv"><span class="k">NPV</span><span class="v ${nb.npv_usd < 0 ? 'pos' : 'neg'}">${usd(nb.npv_usd)}</span></div>
+        <div class="kv"><span class="k">Breaks even if pipe cost falls to</span><span class="v">${be.pipe_cost_breakeven_share != null ? num(be.pipe_cost_breakeven_share * 100) + '<small>% of today</small>' : '—'}</span></div>`
+        : '<p class="muted" style="margin:0">No candidate network.</p>'}
+      </div>
+    </div>
+
+    <h2>All pathways</h2>
+    <p class="lede">20-year NPV, with and without a carbon price.</p>
+    <div class="card flush"><div class="table-wrap"><table>
+      <thead><tr><th>Pathway</th><th>Verdict</th><th class="n">GWh/yr</th><th class="n">Peak MW</th><th class="n">Capex</th><th class="n">NPV</th><th class="n">NPV with carbon</th><th class="n">CO2 t/yr</th></tr></thead>
+      <tbody>${P.map(p => { const v = VERDICT(p.verdict); return `<tr><td>${esc(p.label)}</td><td><span class="pill ${v}">${VLABEL[v]}</span></td>
+        <td class="n">${num((p.delivered_mwh || 0) / 1000, 1)}</td><td class="n">${p.peak_mw == null ? '—' : num(p.peak_mw, 1)}</td><td class="n">${usd(p.capex_usd)}</td>
+        <td class="n">${usd(p.npv_usd)}</td><td class="n">${usd(p.npv_with_carbon_usd)}</td><td class="n">${num(p.co2_avoided_t)}</td></tr>`; }).join('')}</tbody>
+    </table></div></div>
+
+    <div class="grid2" style="margin-top:16px">
+      <div class="card">
+        <div class="card-title">Reused by month <span class="muted">GWh, vs. heat available</span></div>
+        <svg id="design-months" class="chart" viewBox="0 0 520 230" role="img" aria-label="Monthly heat reused by pathway versus heat available"></svg>
+        <div class="legend" id="design-legend"></div>
+      </div>
+      <div class="card flush">
+        <div style="padding:20px 22px 6px"><div class="card-title" style="margin:0">Trucked heat users <span class="muted">${num(tr.served)} of ${num(tr.candidates)} pay off</span></div></div>
+        <div class="table-wrap"><table><thead><tr><th>User</th><th class="n">Road km</th><th class="n">MWh/yr</th><th class="n">Cost $/MWh</th><th class="n">Value $/MWh</th></tr></thead>
+          <tbody>${(tr.users || []).map(u => `<tr><td>${esc(u.name)}</td><td class="n">${num(u.road_km, 1)}</td><td class="n">${num(u.mwh)}</td><td class="n">${num(u.cost_usd_mwh, 1)}</td><td class="n">${num(u.value_usd_mwh, 1)}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">None</td></tr>'}</tbody></table></div>
+      </div>
+    </div>`;
+
+  const det = document.getElementById('pw-detail');
+  const select = i => {
+    body.querySelectorAll('.station').forEach(b => b.setAttribute('aria-pressed', +b.dataset.i === i ? 'true' : 'false'));
+    const p = P[i]; if (!p) { det.innerHTML = ''; return; }
+    const v = VERDICT(p.verdict);
+    det.innerHTML = `<div><h3>${esc(p.label)} <span class="pill ${v}">${VLABEL[v]}</span></h3><p>${esc(p.detail)}.</p></div>
+      <div><div class="kv"><span class="k">Heat delivered</span><span class="v">${num((p.delivered_mwh || 0) / 1000, 1)}<small>GWh/yr</small></span></div>
+      <div class="kv"><span class="k">Capex</span><span class="v">${usd(p.capex_usd)}</span></div>
+      <div class="kv"><span class="k">NPV · with carbon</span><span class="v">${usd(p.npv_usd)}<small>${usd(p.npv_with_carbon_usd)}</small></span></div>
+      <div class="kv"><span class="k">CO2 avoided</span><span class="v">${num(p.co2_avoided_t)}<small>t/yr</small></span></div></div>`;
+  };
+  body.querySelectorAll('.station').forEach(b => b.onclick = () => select(+b.dataset.i));
+  select(0);
+  drawMonths(document.getElementById('design-months'), d.hourly?.months || []);
+}
+
+function drawMonths(svg, months) {
+  const SER = [['network', 'District network', 'var(--ink)'], ['greenhouse', 'Greenhouse', 'var(--green)'], ['aquaculture', 'Aquaculture', 'var(--blue)'], ['drying', 'Drying', 'var(--amber)']];
+  document.getElementById('design-legend').innerHTML = `<span><i style="background:var(--gray-fill)"></i>Available</span>` +
+    SER.filter(([k]) => months.some(m => m[k] > 0)).map(([, l, c]) => `<span><i style="background:${c}"></i>${l}</span>`).join('');
+  if (!months.length) { svg.innerHTML = '<text x="260" y="115" text-anchor="middle" fill="var(--muted)" font-size="12">No monthly data</text>'; return; }
+  const W = 520, H = 230, L = 36, R = 8, T = 10, B = 24, iw = W - L - R, ih = H - T - B;
+  const max = Math.max(1, ...months.map(m => m.avail || 0)), slot = iw / months.length, bw = slot * .56;
+  const y = v => T + ih - v / max * ih;
+  let out = '';
+  [0, .5, 1].forEach(f => out += `<line x1="${L}" x2="${W - R}" y1="${y(f * max)}" y2="${y(f * max)}" stroke="var(--border)"/><text x="${L - 6}" y="${y(f * max) + 4}" fill="var(--muted)" font-size="10.5" text-anchor="end">${Math.round(f * max)}</text>`);
+  const ML = ['J','F','M','A','M','J','J','A','S','O','N','D'];
+  months.forEach((m, i) => {
+    const x = L + i * slot + (slot - bw) / 2;
+    out += `<rect x="${x}" y="${y(m.avail)}" width="${bw}" height="${y(0) - y(m.avail)}" rx="3" fill="var(--gray-fill)"><title>${ML[(m.month || i + 1) - 1]}: ${num(m.avail, 1)} GWh available</title></rect>`;
+    let acc = 0;
+    for (const [k, l, c] of SER) { const v = m[k] || 0; if (v <= 0) continue; out += `<rect x="${x}" y="${y(acc + v)}" width="${bw}" height="${y(acc) - y(acc + v)}" fill="${c}"><title>${l}: ${num(v, 1)} GWh</title></rect>`; acc += v; }
+    out += `<text x="${x + bw / 2}" y="${H - 7}" fill="var(--muted)" font-size="10.5" text-anchor="middle">${ML[(m.month || i + 1) - 1]}</text>`;
+  });
+  svg.innerHTML = out;
+}
+
+function countUp(root) {
+  root.querySelectorAll('[data-count]').forEach(el => {
+    const target = +el.dataset.count, t0 = performance.now(), dur = 700;
+    const step = now => { const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 3); el.textContent = fmt(target * e); if (k < 1) requestAnimationFrame(step); };
+    requestAnimationFrame(step);
+  });
+}
+window.addEventListener('alpine:day', e => {
+  const r = e.detail.row, m = e.detail.max, set = (id, v) => { const el = document.getElementById(id); if (el) el.firstChild.textContent = v; };
+  document.getElementById('s-day').textContent = e.detail.label; document.getElementById('s-scen').textContent = r.scenario.replace('_', ' ');
+  document.getElementById('side').querySelector('.card').classList.toggle('hot', r.scenario !== 'normal');
+  set('s-heat', (r.heat_available_mw / 24).toFixed(0)); set('s-sell', (r.heat_exported_mw / 24).toFixed(0)); set('s-dry', (r.dry_mw / 24).toFixed(0)); set('s-tower', (r.heat_tower_mw / 24).toFixed(0));
+  set('s-water', Math.round(r.water_gal).toLocaleString()); set('s-pit', Math.round(r.storage_soc * 100)); set('s-cost', '$' + Math.round(r.cost_usd / 1000) + 'k');
+  document.getElementById('s-water-bar').style.width = (100 * r.water_gal / m.water) + '%'; document.getElementById('s-pit-bar').style.width = (100 * r.storage_soc) + '%';
+});
+// Minimal, safe markdown for answers: escape first, then **bold**, `code`, and line breaks.
+function md(s) { return esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\n/g, '<br>'); }
+function fmt(v) { if (v == null) return '—'; if (Math.abs(v) >= 1000) return Math.round(v).toLocaleString(); if (Math.abs(v) >= 100) return v.toFixed(0); if (Math.abs(v) >= 10) return v.toFixed(1); return (Math.round(v * 1000) / 1000).toString(); }
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+init();
+</script>
+</body>
+</html>

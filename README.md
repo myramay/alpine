@@ -84,3 +84,15 @@ python design.py                 # plain-English recommendation + summary
 - **Where the storage pit sits**: at the site, or at the load end of the trunk.
 
 Also reported: the best network found even when it loses money, whether it pays at a $190/t carbon price, and the pipe cost at which it would break even. Every cost is in `config/design.yaml` with its source, and most are marked "assumption - verify".
+
+## Frontend
+
+`/` serves `web/light.html`, the production page. It has seven tabs:
+
+- **Site:** a light, minimal 3D map of the real Lansing site (`web/site-light.js`).
+- **Report:** live Keewano PUE / WUE / ERF, the year skyline, the daily chart, and the comparison table.
+- **Pipeline:** each run shown as simulate → Keewano → agent → live report, using the `BuildPipeline` component in `web/vendor/src/components/ui/`, bundled to `web/vendor/pipeline-bundle.js`.
+- **Design:** the heat-reuse recommendation from `/design`.
+- **Ask**, **Decisions** and **Model**.
+
+The original dark page (`web/index.html` + `web/site.js`) is still available at `/classic`.
