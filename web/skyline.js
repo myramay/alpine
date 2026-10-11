@@ -7,7 +7,7 @@
     heat_tower_mw:    { unit: 'MWh',  plural: 'MWh',  title: v => `${v.toLocaleString()} MWh rejected through towers this year`, scale: 1 },
     cost_usd:         { unit: '$',    plural: '$',    title: v => `$${v.toLocaleString()} net cost this year`, scale: 1 },
   };
-  const RED = { dark: ['#3f0f0f', '#7f1d1d', '#b91c1c', '#ef4444'], light: ['#fecaca', '#f87171', '#dc2626', '#7f1d1d'] };
+  const RED = { dark: ['#2a0808', '#8a1515', '#e11d1d', '#ff8080'], light: ['#fecaca', '#f87171', '#dc2626', '#7f1d1d'] };
   let rows = null, metric = 'heat_exported_mw';
   const mount = () => {
     if (!rows || !window.mountSkyline) return;

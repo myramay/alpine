@@ -76,6 +76,19 @@
   .hud-row input[type=range] { flex:1; accent-color:var(--accent); }
   .hud-row span { font:12px var(--mono); color:var(--ink); min-width:56px; }
   .hud-stats { display:none; }
+  .cams { position:absolute; top:12px; right:16px; display:flex; gap:2px; z-index:3; }
+  .cams button { background:rgba(15,15,18,.85); border:1px solid var(--line); color:var(--dim); padding:5px 10px; font:11px var(--mono); letter-spacing:.1em; text-transform:uppercase; cursor:pointer; }
+  .cams button.on { color:var(--ink); border-color:var(--accent); }
+  .scrub { flex:1; position:relative; }
+  .scrub input[type=range] { width:100%; margin:0; }
+  .strip { display:flex; height:3px; margin-top:2px; }
+  .strip i { flex:1; background:transparent; }
+  .strip i.sc { background:var(--accent); }
+  #speed { padding:5px 8px; }
+  .labels { position:absolute; inset:0; pointer-events:none; overflow:hidden; }
+  .lbl { position:absolute; left:0; top:0; font:11px var(--mono); letter-spacing:.12em; text-transform:uppercase; color:var(--ink); background:rgba(9,9,11,.75); border:1px solid var(--line2); padding:4px 8px; white-space:nowrap; transition:opacity .2s; }
+  .lbl.scen { color:var(--accent); border-color:var(--accent); }
+  .lbl.tip3d { text-transform:none; letter-spacing:.02em; font-size:12px; border-color:var(--accent); z-index:2; }
   .keys { position:absolute; top:12px; left:16px; display:flex; gap:14px; flex-wrap:wrap; font:11px var(--mono); color:var(--dim); letter-spacing:.06em; }
   .side { display:flex; flex-direction:column; gap:12px; }
   .side .frame { padding:14px 16px; }
@@ -113,9 +126,10 @@
       <div class="scene-wrap">
         <canvas id="scene"></canvas>
         <div class="hud">
-          <div class="hud-row"><button class="go" id="play">Play</button><input type="range" id="day" min="0" max="364" value="0"><span id="day-label">Jan 1</span></div>
+          <div class="hud-row"><button class="go" id="play">Play</button><select id="speed" title="play speed"><option value="1">1x</option><option value="2">2x</option><option value="4">4x</option></select><div class="scrub"><input type="range" id="day" min="0" max="364" value="0"><div class="strip" id="scen-strip"></div></div><span id="day-label">Jan 1</span></div>
           <div class="hud-stats" id="hud-stats"></div>
         </div>
+        <div class="cams"><button data-cam="overview" class="on">Overview</button><button data-cam="network">Network</button><button data-cam="towers">Towers</button><button data-cam="pit">Pit</button></div>
         <div class="keys">
           <span><i style="background:var(--sell)"></i>to network</span>
           <span><i style="background:var(--store)"></i>pit</span>
