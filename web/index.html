@@ -49,7 +49,9 @@
   input[type=text]:focus { outline:none; border-color:var(--accent); }
   button.go { background:var(--accent); color:#1a1200; border:0; padding:10px 16px; font:12px var(--mono); letter-spacing:.1em; text-transform:uppercase; font-weight:700; cursor:pointer; }
   button.go[disabled] { opacity:.5; cursor:wait; }
-  .answer { margin-top:18px; font-size:20px; }
+  .answer { margin-top:18px; font-size:20px; line-height:1.4; }
+  .answer b { color:var(--accent); font-weight:600; }
+  .answer code { font:0.8em var(--code); color:var(--muted); background:var(--bg); border:1px solid var(--line); padding:1px 5px; }
   .examples { margin-top:14px; display:flex; flex-wrap:wrap; gap:8px; }
   .examples button { background:none; border:1px solid var(--line); color:var(--muted); padding:6px 10px; font:12px var(--mono); cursor:pointer; }
   .examples button:hover { border-color:var(--line2); color:var(--ink); }
@@ -393,7 +395,7 @@ async function ask() {
   const t0 = performance.now();
   try {
     const d = await get('/ask', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ question: q }) });
-    ans.textContent = d.answer; qq.textContent = d.query; qq.style.display = 'block';
+    ans.innerHTML = md(d.answer); qq.textContent = d.query; qq.style.display = 'block';
     const nrows = Array.isArray(d.rows) ? d.rows.length : d.rows;
     st.textContent = `${((performance.now() - t0) / 1000).toFixed(1)} s${nrows != null ? ' · ' + nrows + ' rows' : ''}`;
   } catch (e) { st.innerHTML = `<span class="err">${esc(e.message)}</span>`; }
@@ -415,6 +417,8 @@ window.addEventListener('alpine:day', e => {
   set('s-water', Math.round(r.water_gal).toLocaleString()); set('s-pit', Math.round(r.storage_soc * 100)); set('s-cost', '$' + Math.round(r.cost_usd / 1000) + 'k');
   document.getElementById('s-water-bar').style.width = (100 * r.water_gal / m.water) + '%'; document.getElementById('s-pit-bar').style.width = (100 * r.storage_soc) + '%';
 });
+// Minimal, safe markdown for answers: escape first, then **bold**, `code`, and line breaks.
+function md(s) { return esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\n/g, '<br>'); }
 function fmt(v) { if (v == null) return '—'; if (Math.abs(v) >= 1000) return Math.round(v).toLocaleString(); if (Math.abs(v) >= 100) return v.toFixed(0); if (Math.abs(v) >= 10) return v.toFixed(1); return (Math.round(v * 1000) / 1000).toString(); }
 function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 init();
