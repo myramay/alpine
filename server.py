@@ -39,6 +39,11 @@ def site_js():
     return FileResponse(WEB / "site.js", media_type="application/javascript")
 
 
+@app.get("/skyline.js")
+def skyline_js():
+    return FileResponse(WEB / "skyline.js", media_type="application/javascript")
+
+
 @app.get("/vendor/{name}")
 def vendor(name: str):
     p = (WEB / "vendor" / name).resolve()
