@@ -1,0 +1,94 @@
+# Design stage: how should this site reuse its heat? Every number carries a source.
+# "assumption - verify" means exactly that: a placeholder to replace with a quote or a meter.
+# Site location, heat supply and network temperature come from config/site.yaml and data/supply.csv.
+
+finance:
+  discount_rate: 0.06               # challenge spec
+  horizon_years: 20                 # challenge spec
+  carbon_price_usd_per_t: 190.0     # US EPA social cost of carbon 2023 (2% discount); used only in the "with carbon" NPV; assumption - verify
+  om_share_of_capex: 0.015          # annual O&M as a share of capex; assumption - verify
+
+network:
+  cluster_m: 750.0                  # buildings grouped into ~750 m cells before routing
+  detour_factor: 1.3                # road/right-of-way detour over straight-line distance; assumption - verify
+  pump_kwh_per_mwh: 8.0             # network pumping per MWh delivered (site.yaml pump_kw_per_mw_th)
+  max_seeds: 40                     # largest clusters tried as the far end of the first trunk
+  street_m_per_building: 30.0       # street main + service line inside a cluster, per building; assumption - verify
+  street_cost_share: 0.45           # small-diameter street/service pipe vs that method's trunk $/m; assumption - verify
+  viable_mwh_per_m: 1.5             # rule of thumb: district heat needs ~1.5-2 MWh per metre of pipe per year
+  lake:                             # Cayuga Lake: east-shore line fitted to the gap in the building data (0 buildings within 0.6 km)
+    shore: [[42.48, -76.490], [42.60, -76.655]]   # [lat, lon] at two points; west of this line = west shore
+    around: [42.445, -76.505]       # south end of the lake (Ithaca): cross-lake pipes and trucks go around it
+    allow_crossing: false           # no submarine pipe; assumption - verify
+  tariff_share_of_current_cost: 0.85  # buildings pay 85% of what they pay for heat today (HeatOS deal term "< current cost")
+
+methods:
+  hot_water:                        # 4th-gen 70 C loop, heat pump at the data center
+    label: Hot-water loop (70 C, heat pump at the site)
+    pipe_usd_per_m: 2500.0          # insulated steel/PEX warm loop; challenge spec placeholder
+    loss_per_km: 0.01               # challenge spec default 1%/km
+    station_usd_per_kw: 120.0       # building substation; assumption - verify (HeatOS direct_use_station)
+    hp_at: site
+    hp_usd_per_kw: 800.0            # challenge spec heat_pump_usd_per_kw
+    supply_temp_c: 70.0
+  ambient:                          # 5th-gen ~25 C loop, heat pump in each building
+    label: Ambient loop (~25 C, heat pump in each building)
+    pipe_usd_per_m: 1100.0          # uninsulated HDPE; assumption - verify
+    loss_per_km: 0.002              # near-ground temperature, small losses; assumption - verify
+    station_usd_per_kw: 0.0
+    hp_at: building
+    hp_usd_per_kw: 800.0            # challenge spec heat_pump_usd_per_kw
+    supply_temp_c: 25.0
+    sink_temp_c: 60.0               # building heat pump output
+  direct:                           # 50-55 C warm loop, no heat pump; only low-temperature-capable buildings
+    label: Direct warm loop (55 C, no heat pump)
+    pipe_usd_per_m: 2300.0          # insulated, slightly smaller than 70 C; assumption - verify
+    loss_per_km: 0.01               # challenge spec default 1%/km
+    station_usd_per_kw: 170.0       # substation + low-temperature retrofit allowance; assumption - verify
+    hp_at: none
+    eligible_types: [primaryschool, smalloffice, warehouse, retailstandalone, fullservicerestaurant, outpatient, smallhotel]
+  trucked:                          # mobile thermal storage containers (PCM), for big isolated users
+    label: Trucked thermal storage (PCM containers)
+    usd_per_mwh_fixed: 28.0         # charge/discharge stations and container rental per MWh; assumption - verify (literature EUR 20-60/MWh)
+    usd_per_mwh_km: 1.1             # haulage per MWh per road km; assumption - verify
+    min_mwh_per_year: 400.0         # only worth a truck schedule for large users
+
+heat_pump:
+  carnot_fraction: 0.6              # challenge spec
+  cop_cap: 8.0
+  site_cop: 7.0                     # supply model's own hourly COP P50 at 55 -> 70 C (data/supply.csv cop_p50)
+
+fuels:                              # current fuel when the building's own cost is missing; $/MMBtu of heat, t CO2/MWh of fuel
+  gas:      {usd_per_mmbtu: 16.7, t_co2_per_mwh: 0.181, boiler_eff: 0.85}   # cost: data median for gas; CO2 challenge spec
+  oil:      {usd_per_mmbtu: 39.7, t_co2_per_mwh: 0.25,  boiler_eff: 0.82}   # challenge spec CO2
+  propane:  {usd_per_mmbtu: 39.7, t_co2_per_mwh: 0.215, boiler_eff: 0.85}   # challenge spec CO2
+  electric: {usd_per_mmbtu: 57.1, t_co2_per_mwh: 0.12,  boiler_eff: 1.0}    # resistance heat on the upstate grid
+  wood:     {usd_per_mmbtu: 23.2, t_co2_per_mwh: 0.0,   boiler_eff: 0.7}
+  unknown:  {usd_per_mmbtu: 23.2, t_co2_per_mwh: 0.2,   boiler_eff: 0.85}   # data median; assumption - verify
+
+anchors:                            # new heat users co-located at the site; sizes are targets for a tenant, not existing demand
+  pipe_km: 0.3                      # on-site connection
+  pipe_usd_per_m: 2500.0            # challenge spec placeholder
+  station_usd_per_kw: 120.0         # assumption - verify
+  heat_price_usd_per_mwh: 30.0      # 75% of gas-boiler-equivalent heat (HeatOS deal term for ag offtakers); assumption - verify
+  displaced_fuel: propane           # rural ag heat today; assumption - verify
+  greenhouse:
+    label: Greenhouse (year-round produce)
+    temp_c: 40                      # heating loop; 55 C supply works directly
+    peak_mw_per_acre: 0.55          # cold-climate glasshouse at design night; assumption - verify
+    base_share: 0.15                # summer night/dehumidification load as share of peak; assumption - verify
+    balance_c: 16.0                 # heating balance temperature
+    max_mw: 22.0                    # ~40 acres, the size of the largest US glasshouse projects; assumption - verify
+  aquaculture:
+    label: Recirculating aquaculture (fish farm)
+    temp_c: 28
+    flat: true                      # tanks held at temperature year-round
+    mw_per_unit: 1.0                # one RAS farm unit ~1 MW thermal; assumption - verify
+    max_mw: 5.0                     # assumption - verify
+  drying:
+    label: Crop / lumber drying
+    temp_c: 55                      # low-temperature belt/kiln drying; assumption - verify
+    flat: true
+    mw_per_unit: 2.0
+    booster_cop: 6.0                # small booster heat pump for kiln end-temperatures; assumption - verify
+    max_mw: 8.0                     # assumption - verify

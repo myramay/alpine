@@ -24,5 +24,31 @@
     "query": "SELECT sum(heat_exported_kw) AS heat_exported_kw, sum(power_kwh) AS power_kwh, 1.0 * sum(heat_exported_kw) / sum(power_kwh) AS erf FROM events WHERE run_id = 'normal-69a3c5'"
    }
   ]
+ },
+ "agent-d2a4": {
+  "run_id": "agent-d2a4",
+  "cached": false,
+  "source": "keewano",
+  "computed_at": "2026-10-11T22:17:11+00:00",
+  "metrics": [
+   {
+    "name": "PUE",
+    "value": 1.1170726247127563,
+    "unit": "facility kWh / IT kWh",
+    "query": "SELECT sum(power_kwh) AS power_kwh, sum(it_kwh) AS it_kwh, 1.0 * sum(power_kwh) / sum(it_kwh) AS pue FROM events WHERE run_id = 'agent-d2a4'"
+   },
+   {
+    "name": "WUE",
+    "value": 0.006657447217892513,
+    "unit": "L / IT kWh",
+    "query": "SELECT sum(water_gal) AS water_gal, sum(it_kwh) AS it_kwh, 3.785 * sum(water_gal) / sum(it_kwh) AS wue FROM events WHERE run_id = 'agent-d2a4'"
+   },
+   {
+    "name": "ERF",
+    "value": 0.14695114327638464,
+    "unit": "heat reused / energy in",
+    "query": "SELECT sum(heat_exported_kw) AS heat_exported_kw, sum(power_kwh) AS power_kwh, 1.0 * sum(heat_exported_kw) / sum(power_kwh) AS erf FROM events WHERE run_id = 'agent-d2a4'"
+   }
+  ]
  }
 }

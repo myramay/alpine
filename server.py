@@ -54,8 +54,39 @@ def _ensure_runs():
     """A fresh deploy has no out/: simulate the four scenarios once (about 5 s) so /report works immediately."""
     if os.environ.get("ALPINE_AUTORUN", "1") == "1" and not list(OUT.glob("run_*.json")):
         import thermal
+        if _rebuild_keewano_runs(thermal):
+            return
         for sc in thermal.CFG["scenarios"]:
             thermal.run(scenario=sc, push=False)
+
+
+def _rebuild_keewano_runs(thermal) -> bool:
+    """Re-simulate the runs that are already in Keewano (outputs/runs/index.json, latest Alpine run per
+    scenario) under their own run_ids, so the page's runs and the live /report queries are the same runs.
+    The sim is deterministic; the agent run gets its policy back from decisions_<run_id>.json."""
+    try:
+        idx = json.loads((RUNS_DIR / "index.json").read_text())
+    except (FileNotFoundError, ValueError):
+        return False
+    latest: dict[str, dict] = {}
+    for r in idx:
+        if r.get("sim") == "alpine":
+            latest[r["scenario"]] = r  # index is append-ordered: newest last wins
+    if not latest:
+        return False
+    for sc, r in latest.items():
+        policy_by_day, notes = None, None
+        if sc == "agent":
+            try:
+                doc = json.loads((RUNS_DIR / f"decisions_{r['run_id']}.json").read_text())
+            except (FileNotFoundError, ValueError):
+                continue
+            changed = [d for d in doc.get("days", []) if d.get("changed")]
+            policy_by_day = {d["day"]: d["policy"] for d in changed}
+            notes = {d["day"]: d["reason"][:256] for d in changed}
+        thermal.run(scenario=sc, push=False, run_id=r["run_id"], policy_by_day=policy_by_day,
+                    policy_notes=notes)
+    return True
 
 
 @app.get("/site.js")
@@ -260,6 +291,28 @@ def compare(scenario: str = "normal"):
     return {"scenario": scenario, "policy_b": {"prefer_dry": True},
             "rows": [{"metric": k, "default": a[k], "prefer_dry": b[k],
                       "delta_pct": (b[k] - a[k]) / a[k] * 100 if a[k] else None} for k in keys]}
+
+
+_design_cache: dict = {}
+
+
+@app.get("/design")
+def design_recommend(refresh: bool = False):
+    """How this site should reuse its heat: ranked pathways (network to real buildings, trucked storage,
+    co-located greenhouse / aquaculture / drying), the network route and methods, pit location, and a
+    plain-English recommendation. Computed from data/customers.csv + config/design.yaml (~1-2 s, cached)."""
+    import design
+    if refresh or "rec" not in _design_cache:
+        _design_cache["rec"] = design.recommend()
+        _design_cache["at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return {**_design_cache["rec"], "computed_at": _design_cache["at"]}
+
+
+@app.get("/design/geojson")
+def design_geojson():
+    """Map layer for /design: the site, every building cluster (connected or not, which shore) and pipe segments."""
+    import design
+    return design.geojson(design_recommend()) if "rec" not in _design_cache else design.geojson(_design_cache["rec"])
 
 
 @app.get("/sensitivity")

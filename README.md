@@ -63,3 +63,24 @@ How the Keewano data is shaped: one Keewano entity per run, `uuid5("lansing:<run
 Keewano takes about 5 minutes to make new events queryable. So the daily agent reads each day of the ingested baseline run from Keewano (three SQL queries grouped by day), applies `decide()` to day d-1 to set day d's policy, then re-runs the year as the `agent` run and pushes it. It never queries its own run hour by hour.
 
 API additions: `GET /report?run_id=` (live from Keewano, then the last live result, then local), `POST /ask {question, run_id?}`, `GET /decisions?run_id=` (adds the full log as `detail`), `GET /runs` (adds `keewano_runs`), `POST /run?wait=false` plus `GET /jobs` for background runs, and `GET /health` (adds which env vars are set).
+
+## Design: how should this site reuse its heat?
+
+```bash
+python design.py                 # plain-English recommendation + summary
+# API: GET /design (ranked pathways, network, pit, monthly balance), GET /design/geojson (map layer)
+```
+
+`design.py` compares every way to reuse the heat on the same terms: 20-year NPV at 6%, CO2 avoided, and MW absorbed. It checks each option hour by hour against the captured heat in `data/supply.csv`.
+
+- **District network to real buildings.** The data is `data/customers.csv`: 4,226 buildings within 15 km, with their annual heat use and what they pay for it today. It comes from the HeatOS Lansing parcel and demand pipeline. Homeowner names and addresses are removed and home locations are rounded to about 100 m. Buildings are grouped into 750 m clusters, and a network is grown outward from the site. For each cluster, the cheapest of three methods is chosen:
+  - hot-water loop (heat pump at the site);
+  - ambient loop (heat pump in each building);
+  - direct warm loop (low-temperature buildings only).
+
+  Every pipe is sized for everything downstream of it. Cayuga Lake is respected: west-shore buildings are reached around the south end of the lake at Ithaca, because no submarine pipe is assumed.
+- **Trucked thermal storage** to large users the network doesn't reach.
+- **Co-located users at the site** (greenhouse, aquaculture, drying). They use 55 C heat directly, and each is sized against the heat left every hour, up to a market cap.
+- **Where the storage pit sits**: at the site, or at the load end of the trunk.
+
+Also reported: the best network found even when it loses money, whether it pays at a $190/t carbon price, and the pipe cost at which it would break even. Every cost is in `config/design.yaml` with its source, and most are marked "assumption - verify".
