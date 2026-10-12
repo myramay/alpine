@@ -49,7 +49,8 @@ def _cfgs_for(site: str) -> tuple[dict, dict]:
     design = yaml.safe_load((ROOT / "config" / "design.yaml").read_text())
     if site != "lansing":   # the Cayuga Lake routing block is Lansing's only
         design["network"]["lake"] = {"allow_crossing": True}
-    return cfg, design
+    import assumptions       # per-site overrides (Assumptions tab); assumptions.save() clears this cache
+    return assumptions.apply(cfg, "site", site), assumptions.apply(design, "design", site)
 
 
 def _cfgs() -> tuple[dict, dict]:
@@ -147,12 +148,14 @@ def _load_buildings() -> pd.DataFrame:
 
 def load_hourly(site: str | None = None) -> pd.DataFrame:
     """Captured heat (MW) and outdoor temperature per hour, plus the buildings' normalized demand shape."""
+    import assumptions
     with using(site):
         p = _paths()
+        _, heat_x = assumptions.supply_scale(_SITE.get())   # overridden IT MW / capture fraction
     s = pd.read_csv(p["supply"])
     dm = pd.read_csv(p["demand"])
     shape = dm["demand_mw_p50"].to_numpy()
-    return pd.DataFrame({"avail_mw": s["source_heat_mw_p50"].to_numpy(), "outdoor_c": dm["outdoor_c"].to_numpy(),
+    return pd.DataFrame({"avail_mw": s["source_heat_mw_p50"].to_numpy() * heat_x, "outdoor_c": dm["outdoor_c"].to_numpy(),
                          "bldg_shape": shape / shape.sum()})
 
 
@@ -528,9 +531,13 @@ def pit_location(net: dict) -> dict:
 # ---------------------------------------------------------------------------------- recommend
 
 def recommend(site: str | None = None) -> dict:
-    """site: "lansing" (default) or a sites.py id."""
+    """site: "lansing" (default) or a sites.py id. Adds "provenance": the inputs and data behind every
+    headline and pathway number (assumptions.provenance)."""
     with using(site):
-        return _recommend()
+        rec = _recommend()
+        import assumptions
+        rec["provenance"] = assumptions.provenance(_SITE.get(), rec)
+        return rec
 
 
 def _recommend() -> dict:

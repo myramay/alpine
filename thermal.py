@@ -44,11 +44,13 @@ BOILER_EFF = 0.85  # gas boiler efficiency the delivered heat replaces; assumpti
 
 def site_cfg(site: str = "lansing") -> dict:
     """Lansing: the module-level CFG (the server's /compare and /sensitivity mutate it). Other sites:
-    sites/<id>/site.yaml (sites.py)."""
+    sites/<id>/site.yaml (sites.py). Either way with the site's assumption overrides on top (a copy, so
+    CFG itself is never changed by an override)."""
+    import assumptions
     if site in (None, "lansing"):
-        return CFG
+        return assumptions.apply(CFG, "site", "lansing")
     import sites
-    return sites.load_cfg(site)
+    return assumptions.apply(sites.load_cfg(site), "site", site)
 
 
 def load_inputs(site: str = "lansing") -> pd.DataFrame:
@@ -60,6 +62,14 @@ def load_inputs(site: str = "lansing") -> pd.DataFrame:
         sp, dp = p["supply"], p["demand"]
     s = pd.read_csv(sp, parse_dates=["timestamp"])
     d = pd.read_csv(dp, parse_dates=["timestamp"])
+    import assumptions
+    it_x, heat_x = assumptions.supply_scale(site or "lansing")   # overridden IT MW / capture fraction
+    if (it_x, heat_x) != (1.0, 1.0):
+        for col in s.columns:
+            if col.startswith("it_mw"):
+                s[col] = s[col] * it_x
+            elif col != "timestamp" and not col.startswith("cop"):
+                s[col] = s[col] * heat_x
     df = s.merge(d, on="timestamp")
     df["hour"] = range(len(df))
     df["day"] = df["hour"] // 24
@@ -226,7 +236,8 @@ def run(scenario: str = "normal", push: bool = True, policy: dict | None = None,
         "hours_unmet_demand": int(tot["hours_unmet"]),
     }
     if save is not False:
-        out = Path("out"); out.mkdir(exist_ok=True)
+        import paths
+        out = paths.OUT_DIR; out.mkdir(parents=True, exist_ok=True)
         (out / f"run_{run_id}.json").write_text(json.dumps({
             "run_id": run_id, "scenario": scenario, "site": site, "policy": pol,
             "computed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "summary": summary}, indent=2))
@@ -257,9 +268,10 @@ def keewano_run(kw_rows: list[dict], run_id: str, scenario: str, policy_notes: d
 
 
 def save_hourly(kw_rows: list[dict], run_id: str, scenario: str, summary: dict, policy: dict,
-                out_dir: str = "outputs/runs", site: str = "lansing") -> Path:
+                out_dir: str | None = None, site: str = "lansing") -> Path:
     """Hourly rows in Keewano units to outputs/runs/<run_id>.csv plus an index.json entry; agent.py reads these."""
-    d = Path(out_dir); d.mkdir(parents=True, exist_ok=True)
+    import paths
+    d = Path(out_dir) if out_dir else paths.LOCAL_RUNS_DIR; d.mkdir(parents=True, exist_ok=True)
     path = d / f"{run_id}.csv"
     pd.DataFrame(kw_rows).to_csv(path, index=False)
     idx_path = d / "index.json"
@@ -270,7 +282,7 @@ def save_hourly(kw_rows: list[dict], run_id: str, scenario: str, summary: dict, 
     idx = [e for e in idx if e.get("run_id") != run_id]
     idx.append({"run_id": run_id, "scenario": scenario, "sim": "alpine", "site": site or "lansing", "policy": policy,
                 "created": datetime.now(timezone.utc).isoformat(timespec="seconds"), "totals": summary})
-    idx_path.write_text(json.dumps(idx, indent=1, default=str))
+    paths.write_text_atomic(idx_path, json.dumps(idx, indent=1, default=str))
     return path
 
 

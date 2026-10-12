@@ -357,6 +357,62 @@
     .tools { flex-wrap:wrap; }
   }
 </style>
+<style id="assumptions-css">
+  /* Assumptions tab, before/after strip, export menu, provenance dialog */
+  .as-bar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:14px 18px; position:sticky; top:66px; z-index:5; }
+  .as-bar .grow { flex:1; min-width:180px; font-size:12px; color:var(--muted); }
+  .as-bar .grow b { color:var(--ink); font-weight:500; }
+  .as-grid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:16px; margin-top:16px; align-items:start; }
+  .as-card { padding:0; overflow:hidden; }
+  .as-card > .card-title { padding:16px 20px 10px; margin:0; border-bottom:1px solid var(--border); }
+  .as-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:4px 12px; padding:10px 20px; border-bottom:1px solid var(--border); align-items:center; transition:background .15s; }
+  .as-row:last-child { border-bottom:0; }
+  .as-row.changed { background:#fbf7ef; box-shadow:inset 3px 0 0 var(--amber); }
+  .as-row.saved { box-shadow:inset 3px 0 0 var(--ink); }
+  .as-row.bad { background:#fbf1f1; box-shadow:inset 3px 0 0 var(--red); }
+  .as-label { font-size:13px; display:flex; align-items:center; gap:6px; flex-wrap:wrap; min-width:0; }
+  .as-label .src-btn { border:0; background:none; padding:0; color:var(--muted); cursor:pointer; display:inline-flex; }
+  .as-label .src-btn:hover { color:var(--ink); }
+  .as-sub { font-size:11.5px; color:var(--muted); grid-column:1 / -1; display:flex; gap:10px; flex-wrap:wrap; }
+  .as-src { grid-column:1 / -1; font-size:11.5px; color:var(--muted); background:var(--subtle); border:1px solid var(--border); border-radius:8px; padding:7px 10px; line-height:1.5; }
+  .as-src code { font:10.5px var(--code); }
+  .as-in { display:flex; align-items:center; gap:6px; border:1px solid var(--border); border-radius:8px; background:var(--surface); height:32px; padding:0 10px; }
+  .as-in:focus-within { border-color:#bdbdbd; box-shadow:0 0 0 3px #0000000a; }
+  .as-in input { width:86px; border:0; outline:none; background:transparent; text-align:right; font-size:13px; font-variant-numeric:tabular-nums; }
+  .as-in span { font-size:11.5px; color:var(--muted); white-space:nowrap; max-width:84px; overflow:hidden; text-overflow:ellipsis; }
+  .vbadge { display:inline-flex; align-items:center; height:17px; padding:0 6px; border-radius:99px; font-size:10px; font-weight:500; background:var(--amber-fill); color:var(--amber); letter-spacing:.1px; }
+  .obadge { display:inline-flex; align-items:center; height:17px; padding:0 6px; border-radius:99px; font-size:10px; font-weight:500; background:var(--ink); color:#fff; }
+  .sbadge { display:inline-flex; align-items:center; height:17px; padding:0 6px; border-radius:99px; font-size:10px; font-weight:500; background:var(--blue-fill); color:var(--blue); }
+  .ba { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:0; padding:0; overflow:hidden; margin-top:16px; }
+  .ba > div { padding:14px 18px; min-width:0; }
+  .ba > div + div { border-left:1px solid var(--border); }
+  .ba .cap { font-size:12px; color:var(--muted); }
+  .ba .row { display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; margin-top:4px; }
+  .ba .was { color:var(--muted); font-size:13px; text-decoration:line-through; text-decoration-color:#bbb; font-variant-numeric:tabular-nums; }
+  .ba .now { font-size:21px; font-weight:500; letter-spacing:-.5px; font-variant-numeric:tabular-nums; }
+  .ba .best { font-size:13px; font-weight:500; }
+  .ba .d { font-size:11.5px; font-weight:500; }
+  .ba .d.up { color:var(--green); } .ba .d.down { color:var(--red); } .ba .d.same { color:var(--muted); font-weight:400; }
+  .ba-head { padding:12px 18px; border-bottom:1px solid var(--border); font-size:12.5px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; grid-column:1 / -1; border-left:0 !important; }
+  .ba-head b { font-weight:500; }
+  .menu { position:relative; display:inline-block; }
+  .menu > summary { list-style:none; }
+  .menu > summary::-webkit-details-marker { display:none; }
+  .menu-pop { position:absolute; right:0; top:38px; z-index:30; background:var(--surface); border:1px solid var(--border); border-radius:10px; box-shadow:0 10px 30px #0000001a; padding:5px; min-width:220px; display:flex; flex-direction:column; }
+  .menu-pop a { display:flex; justify-content:space-between; gap:10px; padding:7px 10px; border-radius:6px; color:var(--ink); text-decoration:none; font-size:12.5px; }
+  .menu-pop a:hover { background:var(--hover); }
+  .menu-pop a span { color:var(--muted); font-size:11.5px; }
+  .info-btn { border:0; background:none; padding:0 0 0 4px; color:var(--muted); cursor:pointer; display:inline-flex; vertical-align:-2px; }
+  .info-btn:hover { color:var(--ink); }
+  .info-btn svg.i { width:13px; height:13px; }
+  dialog.prov { width:min(760px, calc(100vw - 32px)); }
+  .prov-body { padding:6px 22px 20px; max-height:70vh; overflow:auto; }
+  .prov-body h4 { font-size:12px; font-weight:500; color:var(--muted); margin:16px 0 6px; text-transform:uppercase; letter-spacing:.4px; }
+  .prov-body ul { margin:0; padding-left:18px; font-size:12.5px; } .prov-body li { margin:3px 0; }
+  .prov-body table td, .prov-body table th { padding:7px 8px; font-size:12px; }
+  .prov-body .how { font-size:12.5px; margin:10px 0 0; }
+  @media (max-width: 860px) { .as-grid { grid-template-columns:1fr; } .ba { grid-template-columns:repeat(2, minmax(0,1fr)); } .ba > div:nth-child(4) { border-left:0; } .as-bar { position:static; } }
+</style>
 </head>
 <body>
 <header>
@@ -395,12 +451,17 @@
     <div class="table-wrap"><table><thead><tr><th>Site</th><th class="n">IT MW</th><th class="n">Heat available</th><th class="n">Share reused</th><th class="n">20-yr NPV</th><th class="n">CO2 avoided</th><th>Best pathway</th><th class="n">Buildings in radius</th><th>District network</th></tr></thead>
       <tbody id="cmp-body"></tbody></table></div>
   </dialog>
+  <dialog class="cmp prov" id="prov-dlg" aria-label="Where this number comes from">
+    <div class="cmp-head"><b id="prov-title">Where this number comes from</b><span class="muted" id="prov-note"></span><button class="btn secondary" id="prov-close" type="button">Close</button></div>
+    <div class="prov-body" id="prov-body"></div>
+  </dialog>
   <div class="tabbar">
     <nav class="switch" role="tablist" aria-label="Sections">
       <button aria-pressed="true" data-tab="site"><svg class="i" viewBox="0 0 24 24"><path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z"/><path d="M15 5.764v15"/><path d="M9 3.236v15"/></svg>Site</button>
       <button aria-pressed="false" data-tab="report"><svg class="i" viewBox="0 0 24 24"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>Report</button>
       <button aria-pressed="false" data-tab="pipeline"><svg class="i" viewBox="0 0 24 24"><line x1="6" x2="6" y1="3" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>Pipeline</button>
       <button aria-pressed="false" data-tab="design"><svg class="i" viewBox="0 0 24 24"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>Design</button>
+      <button aria-pressed="false" data-tab="assumptions"><svg class="i" viewBox="0 0 24 24"><path d="M4 6h10"/><path d="M18 6h2"/><circle cx="16" cy="6" r="2"/><path d="M4 12h4"/><path d="M12 12h8"/><circle cx="10" cy="12" r="2"/><path d="M4 18h12"/><path d="M20 18h0"/><circle cx="18" cy="18" r="2"/></svg>Assumptions</button>
       <button aria-pressed="false" data-tab="ask"><svg class="i" viewBox="0 0 24 24"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>Ask</button>
       <button aria-pressed="false" data-tab="decisions"><svg class="i" viewBox="0 0 24 24"><path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/></svg>Decisions</button>
       <button aria-pressed="false" data-tab="model"><svg class="i" viewBox="0 0 24 24"><line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/></svg>Model</button>
@@ -517,6 +578,18 @@
     <div class="status" id="design-status">Designing the heat reuse…</div>
   </section>
 
+  <section id="assumptions">
+    <div class="card as-bar">
+      <div class="grow" id="as-summary">Loading assumptions…</div>
+      <button class="btn" type="button" id="as-apply" disabled>Apply</button>
+      <button class="btn secondary" type="button" id="as-reset">Reset to defaults</button>
+      <button class="btn secondary" type="button" id="as-rerun" title="Re-simulates the normal year hour by hour with these assumptions and streams it to Keewano; the Report tab's PUE / WUE / ERF come from that run.">Re-run year &amp; stream to Keewano (~2 min)</button>
+    </div>
+    <div id="as-ba"></div>
+    <div class="status" id="as-status"></div>
+    <div class="as-grid" id="as-grid"></div>
+  </section>
+
   <section id="ask">
     <div class="card ask-card">
       <form id="ask-form">
@@ -593,6 +666,7 @@ document.querySelectorAll('nav [data-tab]').forEach(b => b.onclick = () => {
   const tab = b.dataset.tab, first = !opened.has(tab); opened.add(tab);
   if (tab === 'pipeline' && first) mountPipeline();
   if (tab === 'design' && first) loadDesign();
+  if (tab === 'assumptions' && first) loadAssumptions();
   if (tab === 'site') window.dispatchEvent(new Event('resize'));
 });
 // Camera preset buttons: site.js wires the clicks; mirror the selected state here too.
@@ -819,10 +893,10 @@ function renderDesign(d) {
   const body = document.getElementById('design-body');
   body.innerHTML = `
     <div class="card"><div class="stats" style="--n:4">
-      <div><span class="cap">Heat available</span><strong>${num(s.heat_available_gwh)}<em>GWh/yr</em></strong><small>captured at the site</small></div>
-      <div><span class="cap">Reused</span><strong>${num((s.share_reused || 0) * 100)}<em>%</em></strong><small>${num(s.heat_reused_gwh)} GWh/yr to users</small></div>
-      <div><span class="cap">NPV, recommended</span><strong>${usd(s.npv_recommended_usd)}</strong><small>20-year, combined</small></div>
-      <div><span class="cap">CO2 avoided</span><strong>${num(s.co2_avoided_t)}<em>t/yr</em></strong><small>by the recommended pathways</small></div>
+      <div><span class="cap">Heat available${infoBtn('summary.heat_available_gwh', 'Heat available')}</span><strong>${num(s.heat_available_gwh)}<em>GWh/yr</em></strong><small>captured at the site</small></div>
+      <div><span class="cap">Reused${infoBtn('summary.share_reused', 'Share reused')}</span><strong>${num((s.share_reused || 0) * 100)}<em>%</em></strong><small>${num(s.heat_reused_gwh)} GWh/yr to users</small></div>
+      <div><span class="cap">NPV, recommended${infoBtn('summary.npv_recommended_usd', 'NPV, recommended')}</span><strong>${usd(s.npv_recommended_usd)}</strong><small>20-year, combined</small></div>
+      <div><span class="cap">CO2 avoided${infoBtn('summary.co2_avoided_t', 'CO2 avoided')}</span><strong>${num(s.co2_avoided_t)}<em>t/yr</em></strong><small>by the recommended pathways</small></div>
     </div></div>
 
     <h2>Pathways</h2>
@@ -864,7 +938,7 @@ function renderDesign(d) {
     <p class="lede">20-year NPV, with and without a carbon price.</p>
     <div class="card flush"><div class="table-wrap"><table>
       <thead><tr><th>Pathway</th><th>Verdict</th><th class="n">GWh/yr</th><th class="n">Peak MW</th><th class="n">Capex</th><th class="n">NPV</th><th class="n">NPV with carbon</th><th class="n">CO2 t/yr</th></tr></thead>
-      <tbody>${P.map(p => { const v = VERDICT(p.verdict); return `<tr><td>${esc(p.label)}</td><td><span class="pill ${v}">${VLABEL[v]}</span></td>
+      <tbody>${P.map(p => { const v = VERDICT(p.verdict); return `<tr><td>${esc(p.label)}${infoBtn('pathways.' + p.key, p.label)}</td><td><span class="pill ${v}">${VLABEL[v]}</span></td>
         <td class="n">${num((p.delivered_mwh || 0) / 1000, 1)}</td><td class="n">${p.peak_mw == null ? '—' : num(p.peak_mw, 1)}</td><td class="n">${usd(p.capex_usd)}</td>
         <td class="n">${usd(p.npv_usd)}</td><td class="n">${usd(p.npv_with_carbon_usd)}</td><td class="n">${num(p.co2_avoided_t)}</td></tr>`; }).join('')}</tbody>
     </table></div></div>
@@ -887,13 +961,14 @@ function renderDesign(d) {
     body.querySelectorAll('.station').forEach(b => b.setAttribute('aria-pressed', +b.dataset.i === i ? 'true' : 'false'));
     const p = P[i]; if (!p) { det.innerHTML = ''; return; }
     const v = VERDICT(p.verdict);
-    det.innerHTML = `<div><h3>${esc(p.label)} <span class="pill ${v}">${VLABEL[v]}</span></h3><p>${esc(p.detail)}.</p></div>
+    det.innerHTML = `<div><h3>${esc(p.label)}${infoBtn('pathways.' + p.key, p.label)} <span class="pill ${v}">${VLABEL[v]}</span></h3><p>${esc(p.detail)}.</p></div>
       <div><div class="kv"><span class="k">Heat delivered</span><span class="v">${num((p.delivered_mwh || 0) / 1000, 1)}<small>GWh/yr</small></span></div>
       <div class="kv"><span class="k">Capex</span><span class="v">${usd(p.capex_usd)}</span></div>
       <div class="kv"><span class="k">NPV · with carbon</span><span class="v">${usd(p.npv_usd)}<small>${usd(p.npv_with_carbon_usd)}</small></span></div>
       <div class="kv"><span class="k">CO2 avoided</span><span class="v">${num(p.co2_avoided_t)}<small>t/yr</small></span></div></div>`;
   };
   body.querySelectorAll('.station').forEach(b => b.onclick = () => select(+b.dataset.i));
+  if (!body.dataset.prov) { body.dataset.prov = '1'; body.addEventListener('click', e => { const b = e.target.closest('[data-prov]'); if (b) { e.stopPropagation(); showProv(b.dataset.prov, b.dataset.provLabel); } }); }
   select(0);
   drawMonths(document.getElementById('design-months'), d.hourly?.months || []);
 }
@@ -1108,6 +1183,13 @@ async function loadSitePlan() {
         <div class="sp-meta">${num(meta.lat, 4)}, ${num(meta.lon, 4)} · ${num(meta.it_mw)} MW IT · buildings within ${num(s.radius_km || meta.radius_km || 15)} km${meta.display_name ? ' · ' + esc(meta.display_name) : ''}</div></div>
       <div class="sp-actions">
         <button class="btn" type="button" id="sp-download"><svg class="i" viewBox="0 0 24 24"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg>Download plan</button>
+        <details class="menu" id="sp-export"><summary class="btn secondary">Export<svg class="i" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></summary>
+          <div class="menu-pop">
+            <a href="${API_BASE}/sites/${encodeURIComponent(SITE)}/plan.html" target="_blank" rel="noopener">Printable report <span>HTML</span></a>
+            <a href="${API_BASE}/sites/${encodeURIComponent(SITE)}/plan.json" download>Full plan + provenance <span>JSON</span></a>
+            <a href="${API_BASE}/sites/${encodeURIComponent(SITE)}/pathways.csv" download>Pathways <span>CSV</span></a>
+            <a href="${API_BASE}/sites/${encodeURIComponent(SITE)}/assumptions.csv" download>Assumptions <span>CSV</span></a>
+          </div></details>
         <button class="btn secondary" type="button" id="sp-copy">Copy link</button>
         <button class="btn secondary" type="button" id="sp-compare">Compare sites</button>
       </div>
@@ -1122,7 +1204,8 @@ async function loadSitePlan() {
     <div class="sp-note">${SITE === 'lansing'
       ? 'Worked example: demand from real parcel data and trained supply/demand models. Enter any location above to plan your own site.'
       : `Heat demand is estimated from OpenStreetMap buildings and Open-Meteo weather, not metered; prices and cooling constants are Lansing defaults. ${kw && kw.accepted ? `Keewano: ${num(kw.accepted)} events ingested (run ${esc(meta.run_id)}); queryable about 5 minutes after the build.` : kw && kw.error ? 'Keewano push failed: ' + esc(kw.error) : ''}`}</div>`;
-  document.getElementById('sp-download').onclick = () => downloadPlan(meta, rec);
+  document.getElementById('sp-download').onclick = e => serverDownload(e.currentTarget, meta, rec);
+  if (!window._spMenu) { window._spMenu = 1; document.addEventListener('click', e => { const m = document.getElementById('sp-export'); if (m && m.open && !m.contains(e.target)) m.open = false; }); }
   document.getElementById('sp-copy').onclick = async e => {
     const b = e.currentTarget, url = siteUrl(SITE);
     try { await navigator.clipboard.writeText(url); b.textContent = 'Copied'; } catch (_) { window.prompt('Copy this link', url); }
@@ -1189,6 +1272,163 @@ async function openCompare() {
 }
 document.getElementById('cmp-close').onclick = () => { const d = document.getElementById('cmp-dlg'); d.close ? d.close() : d.removeAttribute('open'); };
 document.getElementById('cmp-dlg').addEventListener('click', e => { if (e.target.id === 'cmp-dlg') e.target.close(); });
+
+// ---------------------------------------------------------------- Assumptions, provenance, exports
+const AS = { data: null, edits: {}, busy: false };
+const fmtVal = v => v == null ? '' : (Math.abs(v) >= 1000 ? Math.round(v * 100) / 100 : Math.round(v * 1e6) / 1e6).toString();
+const AFFECTS = { simulation: 'simulated year', both: 'plan + simulated year', design: 'plan' };
+
+async function loadAssumptions() {
+  const st = document.getElementById('as-status');
+  try {
+    AS.data = await get(`/sites/${encodeURIComponent(SITE)}/assumptions`);
+    AS.edits = {};
+    renderAssumptions();
+    st.textContent = '';
+  } catch (e) {
+    document.getElementById('as-grid').innerHTML = '';
+    st.innerHTML = `<span class="err">Assumptions unavailable: ${esc(e.message.slice(0, 200))}</span>`;
+  }
+}
+
+function asItems() { return (AS.data?.groups || []).flatMap(g => g.items); }
+
+function renderAssumptions() {
+  const grid = document.getElementById('as-grid');
+  grid.innerHTML = (AS.data.groups || []).filter(g => g.items.length).map(g => `
+    <div class="card as-card"><div class="card-title">${esc(g.group)} <span class="muted">${g.items.length}</span></div>
+      ${g.items.map(i => `<div class="as-row ${i.overridden ? 'saved' : ''}" data-key="${esc(i.key)}">
+        <div class="as-label">${esc(i.label)}
+          ${i.verify ? '<span class="vbadge" title="The source says &quot;assumption - verify&quot;: replace with a quote or a meter">verify</span>' : ''}
+          ${i.overridden ? '<span class="obadge" title="Overridden for this site">overridden</span>' : ''}
+          ${i.affects === 'simulation' ? '<span class="sbadge" title="Moves the hourly simulation (Report tab); re-run the year to see it">sim</span>' : ''}
+          <button type="button" class="src-btn" data-src aria-label="Source" title="${esc(i.source || 'no source note')}"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></button></div>
+        <label class="as-in"><input type="number" inputmode="decimal" step="any" min="${i.min}" max="${i.max}" value="${esc(fmtVal(i.value))}" aria-label="${esc(i.label)}"><span title="${esc(i.unit)}">${esc(i.unit)}</span></label>
+        <div class="as-sub"><span>default ${esc(fmtVal(i.default))}</span><span>range ${esc(fmtVal(i.min))}–${esc(fmtVal(i.max))}</span><span>moves the ${AFFECTS[i.affects] || 'plan'}</span></div>
+        <div class="as-src" hidden><code>${esc(i.key)}</code> · ${esc(i.file_path)}<br>${esc(i.source || 'No source note in the config.')}</div>
+      </div>`).join('')}
+    </div>`).join('');
+  grid.querySelectorAll('.as-row').forEach(row => {
+    const key = row.dataset.key, it = asItems().find(i => i.key === key), inp = row.querySelector('input');
+    row.querySelector('[data-src]').onclick = () => { const s = row.querySelector('.as-src'); s.hidden = !s.hidden; };
+    inp.oninput = () => {
+      const v = inp.value.trim() === '' ? null : Number(inp.value);
+      const bad = v == null || !isFinite(v) || v < it.min || v > it.max;
+      if (!bad && Math.abs(v - it.value) < 1e-12) delete AS.edits[key]; else AS.edits[key] = bad ? NaN : v;
+      row.classList.toggle('changed', key in AS.edits && !bad);
+      row.classList.toggle('bad', bad);
+      asSummary();
+    };
+  });
+  asSummary();
+}
+
+function asSummary() {
+  const items = asItems(), n = Object.keys(AS.edits).length, bad = Object.values(AS.edits).some(v => Number.isNaN(v));
+  const ov = items.filter(i => i.overridden).length, ver = items.filter(i => i.verify).length;
+  document.getElementById('as-summary').innerHTML = `<b>${items.length}</b> assumptions · <b>${ov}</b> overridden for this site · <b>${ver}</b> marked verify`
+    + (n ? ` · <b style="color:var(--amber)">${n} unsaved change${n === 1 ? '' : 's'}</b>` : '')
+    + (bad ? ' · <span class="err">fix the highlighted values (out of range)</span>' : '');
+  document.getElementById('as-apply').disabled = AS.busy || !n || bad;
+  document.getElementById('as-reset').disabled = AS.busy || !ov;
+}
+
+function baStrip(r, title) {
+  const b = r.before || {}, a = r.after || {};
+  const cell = (cap, was, now, d, good) => `<div><div class="cap">${cap}</div><div class="row">${was !== now ? `<span class="was">${was}</span>` : ''}<span class="now">${now}</span>
+    <span class="d ${d === 0 || d == null ? 'same' : (d > 0) === good ? 'up' : 'down'}">${d === 0 || d == null ? 'no change' : (d > 0 ? '+' : '−') + d.txt}</span></div></div>`;
+  const dd = (x, y, f) => { const v = (y ?? 0) - (x ?? 0); if (Math.abs(v) < 1e-9) return 0; const o = new Number(v); o.txt = f(Math.abs(v)); return o; };
+  const n = (r.changed || []).length;
+  return `<div class="card ba"><div class="ba-head"><b>${esc(title)}</b><span class="muted">${n} number${n === 1 ? '' : 's'} moved · ${Object.keys(r.overrides || {}).length} override${Object.keys(r.overrides || {}).length === 1 ? '' : 's'} in effect</span></div>
+    ${cell('Heat reused', pct(b.share_reused), pct(a.share_reused), dd(b.share_reused, a.share_reused, v => num(v * 100, 1) + ' pts'), true)}
+    ${cell('20-year NPV, recommended', usd(b.npv_recommended_usd), usd(a.npv_recommended_usd), dd(b.npv_recommended_usd, a.npv_recommended_usd, v => usd(v)), true)}
+    ${cell('CO2 avoided', num(b.co2_avoided_t) + ' t', num(a.co2_avoided_t) + ' t', dd(b.co2_avoided_t, a.co2_avoided_t, v => num(v) + ' t'), true)}
+    <div><div class="cap">Best pathway</div><div class="row">${b.best_pathway !== a.best_pathway ? `<span class="was">${esc(b.best_pathway || 'None pays')}</span>` : ''}<span class="best">${esc(a.best_pathway || 'None pays')}</span>
+      <span class="d same">${b.best_pathway === a.best_pathway ? 'unchanged' : 'changed'}</span></div></div></div>`;
+}
+
+async function afterAssumptions(r, title) {
+  document.getElementById('as-ba').innerHTML = baStrip(r, title);
+  AS.data = r.assumptions; AS.edits = {}; renderAssumptions();
+  DESIGN_P = null; DESIGN = null; delete CMP[SITE];
+  if (opened.has('design')) loadDesign();
+  loadSitePlan(); loadSites();
+}
+
+async function asSend(method, body, title) {
+  const st = document.getElementById('as-status');
+  AS.busy = true; asSummary();
+  st.textContent = 'Recomputing the plan with these assumptions (about 3 s)…';
+  try {
+    const r = await get(`/sites/${encodeURIComponent(SITE)}/assumptions`, { method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+    await afterAssumptions(r, title);
+    st.textContent = `Saved ${new Date().toLocaleTimeString()}. The plan, site card, exports and Design tab now use these values. Assumptions marked "sim" change the Report tab only after a re-run.`;
+  } catch (e) {
+    st.innerHTML = `<span class="err">${esc(e.message.replace(/^\d+ /, '').slice(0, 400))}</span>`;
+  } finally { AS.busy = false; asSummary(); }
+}
+
+document.getElementById('as-apply').onclick = () => asSend('PUT', AS.edits, 'Applied: before → after');
+document.getElementById('as-reset').onclick = () => { if (confirm('Reset every assumption for this site to its default?')) asSend('DELETE', null, 'Reset to defaults: before → after'); };
+document.getElementById('as-rerun').onclick = async e => {
+  const b = e.currentTarget, st = document.getElementById('as-status');
+  if (Object.keys(AS.edits).length && !confirm('You have unsaved changes. Re-run with the saved assumptions?')) return;
+  b.disabled = true;
+  try {
+    const j = await get(`/sites/${encodeURIComponent(SITE)}/rerun`, { method: 'POST' });
+    st.innerHTML = `Re-running the year as <code>${esc(j.run_id)}</code> and streaming it to Keewano…`;
+    const t0 = Date.now();
+    const poll = async () => {
+      const job = ((await get('/jobs')).jobs || []).find(x => x.run_id === j.run_id) || {};
+      const secs = Math.round((Date.now() - t0) / 1000);
+      if (job.status === 'done') { st.innerHTML = `Run <code>${esc(j.run_id)}</code> done in ${secs} s: ${num(job.sent || 0)} events sent to Keewano (queryable in ~5 min). Reload the Report tab to see it.`; b.disabled = false; return; }
+      if (job.status === 'error') { st.innerHTML = `<span class="err">Re-run failed: ${esc(job.error || '')}</span>`; b.disabled = false; return; }
+      st.innerHTML = `Run <code>${esc(j.run_id)}</code>: ${esc(job.status || 'queued')}… ${secs} s`;
+      setTimeout(poll, 3000);
+    };
+    setTimeout(poll, 1500);
+  } catch (err) { st.innerHTML = `<span class="err">${esc(err.message.slice(0, 300))}</span>`; b.disabled = false; }
+};
+
+// Provenance: the info icon next to a number opens what went into it.
+const infoBtn = (path, label) => `<button type="button" class="info-btn" data-prov="${esc(path)}" data-prov-label="${esc(label || '')}" aria-label="Where this number comes from" title="Where this number comes from"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></button>`;
+function showProv(path, label) {
+  const pv = DESIGN?.provenance; if (!pv) return;
+  const [kind, key] = path.split('.'), e = (pv[kind] || {})[key] || {};
+  document.getElementById('prov-title').textContent = label || key;
+  const ins = e.inputs || [], ov = ins.filter(i => i.overridden).length;
+  document.getElementById('prov-note').textContent = `${ins.length} inputs · ${ov} overridden · ${ins.filter(i => i.verify).length} marked verify`;
+  const kw = pv.keewano;
+  document.getElementById('prov-body').innerHTML = `
+    ${e.how ? `<p class="how">${esc(e.how)}</p>` : ''}
+    <h4>Assumptions used</h4>
+    <div class="table-wrap"><table><thead><tr><th>Input</th><th class="n">Value</th><th class="n">Default</th><th>Source</th></tr></thead><tbody>
+    ${ins.map(i => `<tr><td>${esc(i.label)} ${i.overridden ? '<span class="obadge">overridden</span>' : ''} ${i.verify ? '<span class="vbadge">verify</span>' : ''}<div class="muted" style="font:10.5px var(--code)">${esc(i.key)}</div></td>
+      <td class="n">${esc(fmtVal(i.value))} <span class="muted">${esc(i.unit)}</span></td><td class="n muted">${esc(fmtVal(i.default))}</td><td class="muted" style="font-size:11.5px">${esc(i.source || '—')}</td></tr>`).join('') || '<tr><td colspan="4" class="muted">None</td></tr>'}
+    </tbody></table></div>
+    <h4>Data</h4><ul>${(e.data || []).map(d => `<li>${esc(d)}</li>`).join('') || '<li class="muted">—</li>'}</ul>
+    ${kw ? `<h4>Simulation in Keewano</h4><p class="how" style="margin-top:0">Run <code>${esc(kw.run_id)}</code>; PUE / WUE / ERF on the Report tab are Keewano SQL over it.</p>` : ''}
+    <p class="how muted">Change any of these on the Assumptions tab; every export lists them with their sources.</p>`;
+  const d = document.getElementById('prov-dlg'); if (typeof d.showModal === 'function') d.showModal(); else d.setAttribute('open', '');
+}
+document.getElementById('prov-close').onclick = () => { const d = document.getElementById('prov-dlg'); d.close ? d.close() : d.removeAttribute('open'); };
+document.getElementById('prov-dlg').addEventListener('click', e => { if (e.target.id === 'prov-dlg') e.target.close(); });
+
+// Download plan: the server-rendered report (works from links and scripts); the in-page version if that fails.
+async function serverDownload(btn, meta, rec) {
+  const label = btn.innerHTML; btn.disabled = true;
+  try {
+    const r = await fetch(`${API_BASE}/sites/${encodeURIComponent(SITE)}/plan.html?download=1`);
+    if (!r.ok) throw new Error(r.status);
+    const name = (r.headers.get('content-disposition') || '').match(/filename="([^"]+)"/)?.[1] || `alpine-plan-${SITE}.html`;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(await r.blob()); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  } catch (e) {
+    downloadPlan(meta, rec);
+  } finally { btn.disabled = false; btn.innerHTML = label; }
+}
 
 loadSites();
 loadSitePlan();

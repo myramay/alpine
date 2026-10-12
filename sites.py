@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import copy
 import json
+import logging
 import math
 import re
 import threading
@@ -34,9 +35,14 @@ import numpy as np
 import pandas as pd
 import yaml
 
-ROOT = Path(__file__).resolve().parent
-SITES_DIR = ROOT / "sites"
-GEO_DIR = ROOT / "web" / "geo"
+import paths as _paths
+
+ROOT = _paths.REPO_ROOT
+SITES_DIR = _paths.SITES_DIR      # writable: DATA_DIR/sites (the repo's sites/ when DATA_DIR is unset)
+GEO_DIR = _paths.GEO_DIR          # writable: DATA_DIR/geo (the repo's web/geo when DATA_DIR is unset)
+# Shipped example sites in the repo, read when DATA_DIR is set and has no copy (DATA_DIR wins on id clash).
+REPO_SITES_DIR = _paths.REPO_SITES_DIR if _paths.PERSISTENT else None
+log = logging.getLogger("alpine.sites")
 DEFAULT_SITE = "lansing"
 ID_RE = re.compile(r"^[a-z0-9_]{1,48}$")
 STEPS = ["geocoding", "weather", "buildings", "demand", "simulating", "streaming to Keewano", "designing", "ready"]
@@ -67,12 +73,28 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+def site_dir(site: str) -> Path:
+    """sites/<id> under DATA_DIR, else the repo's shipped copy, else (new site) the DATA_DIR path."""
+    d = SITES_DIR / site
+    if not d.exists() and REPO_SITES_DIR is not None and (REPO_SITES_DIR / site).is_dir():
+        return REPO_SITES_DIR / site
+    return d
+
+
+def _site_ids() -> list[str]:
+    """Every site directory id: DATA_DIR sites merged with the repo's shipped ones."""
+    ids = {p.name for p in SITES_DIR.glob("*") if p.is_dir()}
+    if REPO_SITES_DIR is not None:
+        ids |= {p.name for p in REPO_SITES_DIR.glob("*") if p.is_dir()}
+    return sorted(i for i in ids if ID_RE.match(i))
+
+
 def check_id(site: str | None) -> str:
     """A safe, existing site id (default lansing). Raises ValueError otherwise."""
     site = site or DEFAULT_SITE
     if not isinstance(site, str) or not ID_RE.match(site):
         raise ValueError(f"invalid site id {site!r}")
-    if site != DEFAULT_SITE and not (SITES_DIR / site / "site.yaml").exists():
+    if site != DEFAULT_SITE and not (site_dir(site) / "site.yaml").exists():
         raise ValueError(f"unknown or unfinished site {site!r}")
     return site
 
@@ -81,12 +103,15 @@ def paths(site: str = DEFAULT_SITE) -> dict[str, Path]:
     if site == DEFAULT_SITE:
         return {"site": ROOT / "config" / "site.yaml", "supply": ROOT / "data" / "supply.csv",
                 "demand": ROOT / "data" / "demand.csv", "customers": ROOT / "data" / "customers.csv",
-                "geo": GEO_DIR / "lansing.json", "dir": ROOT}
+                "geo": _paths.REPO_GEO_DIR / "lansing.json", "dir": ROOT}
     if not ID_RE.match(site or ""):
         raise ValueError(f"invalid site id {site!r}")
-    d = SITES_DIR / site
+    d = site_dir(site)
+    geo = GEO_DIR / f"{site}.json"
+    if not geo.exists() and REPO_SITES_DIR is not None and (_paths.REPO_GEO_DIR / f"{site}.json").exists():
+        geo = _paths.REPO_GEO_DIR / f"{site}.json"
     return {"site": d / "site.yaml", "supply": d / "supply.csv", "demand": d / "demand.csv",
-            "customers": d / "customers.csv", "geo": GEO_DIR / f"{site}.json", "dir": d,
+            "customers": d / "customers.csv", "geo": geo, "dir": d,
             "meta": d / "meta.json", "raw": d / "raw"}
 
 
@@ -107,7 +132,7 @@ def read_meta(site: str) -> dict | None:
                 "notes": ["Worked example: modelled demand from real parcel data."]}
     if not ID_RE.match(site or ""):
         return None
-    p = SITES_DIR / site / "meta.json"
+    p = site_dir(site) / "meta.json"
     try:
         return json.loads(p.read_text())
     except (FileNotFoundError, ValueError):
@@ -117,18 +142,21 @@ def read_meta(site: str) -> dict | None:
 def _write_meta(site: str, **upd) -> dict:
     with _lock:
         p = SITES_DIR / site / "meta.json"
+        if not p.exists() and site_dir(site) != SITES_DIR / site:   # a shipped site: copy-on-write
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_bytes((site_dir(site) / "meta.json").read_bytes())
         try:
             meta = json.loads(p.read_text())
         except (FileNotFoundError, ValueError):
             meta = {"id": site}
         meta.update(upd, updated=_now())
-        tmp = p.with_suffix(".tmp")
-        tmp.write_text(json.dumps(meta, indent=1, default=str))
-        tmp.replace(p)
+        _paths.write_text_atomic(p, json.dumps(meta, indent=1, default=str))
         return meta
 
 
 def set_status(site: str, step: str, **extra) -> dict:
+    if step not in ("ready", "error"):
+        log.info(json.dumps({"event": "site_build_step", "site": site, "step": step}))
     i = STEPS.index(step) if step in STEPS else 0
     status = "ready" if step == "ready" else "error" if step == "error" else "building"
     return _write_meta(site, status=status, step=step, progress=round(i / (len(STEPS) - 1), 3), **extra)
@@ -137,13 +165,13 @@ def set_status(site: str, step: str, **extra) -> dict:
 def list_sites() -> list[dict]:
     """Lansing first, then every site in sites/ by creation time."""
     out = [read_meta(DEFAULT_SITE)]
-    rest = [m for m in (read_meta(p.name) for p in sorted(SITES_DIR.glob("*")) if p.is_dir()) if m]
+    rest = [m for m in (read_meta(sid) for sid in _site_ids()) if m]
     rest.sort(key=lambda m: str(m.get("created") or ""))
     return out + rest
 
 
 def slugify(text: str, taken: set[str] | None = None) -> str:
-    taken = set(taken if taken is not None else {p.name for p in SITES_DIR.glob("*")}) | {DEFAULT_SITE}
+    taken = set(taken if taken is not None else _site_ids()) | {DEFAULT_SITE}
     base = re.sub(r"[^a-z0-9]+", "_", (text or "").lower()).strip("_")[:40].strip("_") or "site"
     if base[0].isdigit():
         base = "site_" + base
@@ -616,7 +644,7 @@ def reserve(name: str | None = None, address: str | None = None, lat: float | No
     if not label:
         raise ValueError("give an address, a name or lat/lon")
     with _lock:
-        SITES_DIR.mkdir(exist_ok=True)
+        SITES_DIR.mkdir(parents=True, exist_ok=True)
         sid = slugify(label if not ll or name else f"site_{lat:.3f}_{lon:.3f}")
         (SITES_DIR / sid).mkdir(parents=True)
     _write_meta(sid, id=sid, name=label, address=address, lat=lat, lon=lon, it_mw=float(it_mw),
@@ -634,6 +662,7 @@ def build(site_id: str, push: bool = True, tile_km: float = 1.2) -> str:
     raw.mkdir(parents=True, exist_ok=True)
     it_mw, radius_km = float(meta.get("it_mw") or 100.0), float(meta.get("radius_km") or 5.0)
     step = "geocoding"
+    log.info(json.dumps({"event": "site_build_start", "site": site_id, "it_mw": it_mw}))
     try:
         set_status(site_id, step, started=_now())
         lat, lon, name = meta.get("lat"), meta.get("lon"), meta.get("name")
@@ -671,6 +700,7 @@ def build(site_id: str, push: bool = True, tile_km: float = 1.2) -> str:
         dem.to_csv(p["demand"], index=False)
         cust.to_csv(p["customers"], index=False)
         GEO_DIR.mkdir(parents=True, exist_ok=True)
+        p["geo"] = GEO_DIR / f"{site_id}.json"     # always write the DATA_DIR copy
         p["geo"].write_text(json.dumps(build_geo(proj, buildings, water, cust, tile_m), separators=(",", ":")))
         _write_meta(site_id, facts=facts, sources={
             "geocode": "Nominatim (OpenStreetMap)" if meta.get("lat") is None else "entered lat/lon",
@@ -720,8 +750,11 @@ def build(site_id: str, push: bool = True, tile_km: float = 1.2) -> str:
         ready_note = ("ready (Keewano data queryable in ~5 min)" if kw.get("accepted") else "ready")
         set_status(site_id, "ready", headline=headline, ready_note=ready_note,
                    seconds=round(time.monotonic() - t0, 1), finished=_now())
+        log.info(json.dumps({"event": "site_build_ready", "site": site_id,
+                             "seconds": round(time.monotonic() - t0, 1)}))
         return site_id
     except Exception as e:  # noqa: BLE001
+        log.error(json.dumps({"event": "site_build_error", "site": site_id, "step": step, "error": _safe(e)}))
         traceback.print_exc()
         set_status(site_id, "error", failed_step=step, error=_safe(e), finished=_now())
         raise

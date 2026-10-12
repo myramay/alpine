@@ -207,8 +207,9 @@ def summarize(run: Run) -> dict:
 
 
 def save_run(run: Run, out_dir="outputs/runs") -> str:
+    import paths
     if not os.path.isabs(out_dir):
-        out_dir = os.path.join(ROOT, out_dir)
+        out_dir = os.path.join(paths.DATA_DIR, out_dir)   # the repo root when DATA_DIR is unset
     os.makedirs(out_dir, exist_ok=True)
     path = os.path.join(out_dir, f"{run.run_id}.csv")
     pd.DataFrame(run.hourly).to_csv(path, index=False)
@@ -221,8 +222,7 @@ def save_run(run: Run, out_dir="outputs/runs") -> str:
     idx.append({"run_id": run.run_id, "scenario": run.scenario,
                 "created": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                 "totals": summarize(run)})
-    with open(idx_path, "w") as f:
-        json.dump(idx, f, indent=1)
+    paths.write_text_atomic(idx_path, json.dumps(idx, indent=1))
     return path
 
 

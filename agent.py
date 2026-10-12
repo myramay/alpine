@@ -61,9 +61,11 @@ from pathlib import Path
 import schema
 from schema import Policy
 
+import paths as _paths
+
 ROOT = Path(__file__).resolve().parent
-RUNS_DIR = ROOT / "outputs" / "runs"
-OUT_DIR = ROOT / "out"  # Alpine's local run files (thermal.run) and decisions.json for the web page
+RUNS_DIR = _paths.RUNS_DIR              # DATA_DIR/outputs/runs (repo outputs/runs when DATA_DIR is unset)
+OUT_DIR = _paths.DATA_DIR / "out"  # Alpine's local run files (thermal.run) and decisions.json for the web page
 INDEX_PATH = RUNS_DIR / "index.json"
 QUESTIONS_PATH = ROOT / "questions.md"
 

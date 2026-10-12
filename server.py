@@ -20,12 +20,21 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 load_dotenv()
-OUT = Path("out")
-OUT.mkdir(exist_ok=True)
+import logging  # noqa: E402
+import guards  # noqa: E402
+import paths  # noqa: E402  (after load_dotenv: DATA_DIR may come from .env)
+
+if not logging.getLogger().handlers:
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+if paths.PERSISTENT:   # a fresh volume gets the repo's shipped runs, report cache and example sites
+    _seeded = paths.seed()
+    logging.getLogger("alpine").info(json.dumps({"event": "seed", "data_dir": str(paths.DATA_DIR), "copied": _seeded}))
+OUT = paths.OUT_DIR                              # local runs; "out" (cwd) when DATA_DIR is unset
+OUT.mkdir(parents=True, exist_ok=True)
 
 ROOT = Path(__file__).resolve().parent
-RUNS_DIR = ROOT / "outputs" / "runs"            # Keewano runs: <run_id>.csv, index.json, decisions_<id>.json
-REPORT_CACHE_PATH = ROOT / "outputs" / "report_cache.json"
+RUNS_DIR = paths.RUNS_DIR                        # Keewano runs: <run_id>.csv, index.json, decisions_<id>.json
+REPORT_CACHE_PATH = paths.REPORT_CACHE_PATH
 ENV_VARS = ["ANTHROPIC_API_KEY", "KEEWANO_API_KEY", "KEEWANO_PAT", "KEEWANO_MCP_URL",
             "KEEWANO_EMAIL", "KEEWANO_PROJECT_ID"]
 _lock = threading.Lock()
@@ -46,7 +55,9 @@ def _load_report_cache() -> dict:
 _report_cache: dict[str, dict] = _load_report_cache()
 
 app = FastAPI(title="Alpine")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+_origins = [o.strip() for o in os.environ.get("ALLOWED_ORIGINS", "").split(",") if o.strip()]
+app.add_middleware(CORSMiddleware, allow_origins=_origins or ["*"], allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(guards.GuardMiddleware)   # outermost: access log, body cap, per-IP rate limits
 WEB = Path(__file__).parent / "web"
 
 
@@ -112,10 +123,13 @@ def skyline_js():
 
 @app.get("/geo/{name}")
 def geo(name: str):
-    p = (WEB / "geo" / name).resolve()
-    if p.parent != (WEB / "geo").resolve() or not p.exists():
-        raise HTTPException(404)
-    return FileResponse(p, media_type="application/json")
+    """User-built sites' maps live in DATA_DIR/geo; the repo's web/geo has lansing + shipped examples."""
+    import sites
+    for d in dict.fromkeys([sites.GEO_DIR, WEB / "geo"]):
+        p = (d / name).resolve()
+        if p.parent == d.resolve() and p.is_file():
+            return FileResponse(p, media_type="application/json")
+    raise HTTPException(404)
 
 
 @app.get("/vendor/{name}")
@@ -218,8 +232,7 @@ def report(run_id: str | None = None):
         live = agent.report(run_id)
         with _lock:
             _report_cache[live["run_id"]] = live
-            REPORT_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
-            REPORT_CACHE_PATH.write_text(json.dumps(_report_cache, indent=1, default=str))
+            paths.write_text_atomic(REPORT_CACHE_PATH, json.dumps(_report_cache, indent=1, default=str))
         return live
     except Exception as e:  # noqa: BLE001 - Keewano slow/unreachable: cached, then local
         key = run_id
@@ -495,6 +508,142 @@ def get_site(site_id: str):
     return _site_view(meta, full=True)
 
 
+# ------------------------------------------------------------- assumptions, re-run, exports
+
+def _invalidate(site: str) -> None:
+    """Overrides changed: drop every cached result for the site."""
+    import design
+    design._cfgs_for.cache_clear()
+    with _lock:
+        _design_cache.pop(site, None)
+        for k in [k for k in _SENS_CACHE if k[0] == site]:
+            _SENS_CACHE.pop(k, None)
+
+
+def _changes(site: str, before: dict, after: dict) -> dict:
+    """Headline before/after plus every summary and pathway number that moved."""
+    import assumptions
+    import sites
+    hb, ha = sites.headline_of(before), sites.headline_of(after)
+    changed = []
+    for k in ("heat_available_gwh", "heat_reused_gwh", "share_reused", "npv_recommended_usd", "co2_avoided_t"):
+        a, b = before["summary"].get(k), after["summary"].get(k)
+        if a != b:
+            changed.append({"what": f"summary.{k}", "before": a, "after": b})
+    pb = {p["key"]: p for p in before["pathways"]}
+    for p in after["pathways"]:
+        q = pb.get(p["key"], {})
+        for k in ("verdict", "delivered_mwh", "npv_usd", "npv_with_carbon_usd", "co2_avoided_t"):
+            if q.get(k) != p.get(k):
+                changed.append({"what": f"{p['key']}.{k}", "label": p["label"], "before": q.get(k), "after": p.get(k)})
+    if site != "lansing":     # the site chip / compare row show the stored headline
+        sites._write_meta(site, headline=ha)
+    return {"site": site, "before": hb, "after": ha, "changed": changed,
+            "overrides": assumptions.load_overrides(site), "assumptions": assumptions.grouped(site)}
+
+
+@app.get("/sites/{site_id}/assumptions")
+def get_assumptions(site_id: str):
+    """Every assumption that moves this site's plan, grouped: value, default, unit, range, source, verify flag."""
+    import assumptions
+    return assumptions.grouped(_site(site_id))
+
+
+@app.put("/sites/{site_id}/assumptions")
+def put_assumptions(site_id: str, body: dict):
+    """{key: value, ...} (null resets one key). Validated (numeric, within range), saved to the site's
+    overrides, then /design is recomputed: returns the headline before/after and every number that moved."""
+    import assumptions
+    site = _site(site_id)
+    before = _design(site)["rec"]
+    try:
+        assumptions.save(site, body)
+    except ValueError as e:
+        raise HTTPException(422, str(e)[:1000])
+    _invalidate(site)
+    return _changes(site, before, _design(site, refresh=True)["rec"])
+
+
+@app.delete("/sites/{site_id}/assumptions")
+def delete_assumptions(site_id: str):
+    """Back to the defaults in site.yaml / design.yaml; recomputes /design."""
+    import assumptions
+    site = _site(site_id)
+    before = _design(site)["rec"]
+    assumptions.reset(site)
+    _invalidate(site)
+    return _changes(site, before, _design(site, refresh=True)["rec"])
+
+
+def _rerun_job(run_id: str, site: str) -> None:
+    _run_job(run_id, "normal", True, "alpine", site)
+    job = JOBS.get(run_id, {})
+    if job.get("status") == "done":
+        if site != "lansing":
+            import sites
+            sites._write_meta(site, run_id=run_id, keewano={"accepted": job.get("sent"), "events": job.get("events"),
+                                                             "rerun": True})
+        _invalidate(site)
+
+
+@app.post("/sites/{site_id}/rerun")
+def rerun_site(site_id: str, background: BackgroundTasks):
+    """Re-simulate the normal year with the site's current assumptions and stream it to Keewano (background,
+    ~2 min). Poll GET /jobs (kind "rerun")."""
+    site = _site(site_id)
+    run_id = f"normal-{datetime.now(timezone.utc):%m%d%H%M}-{uuid.uuid4().hex[:4]}"
+    JOBS[run_id] = {"run_id": run_id, "scenario": "normal", "sim": "alpine", "site": site, "kind": "rerun",
+                    "status": "queued", "started": _now()}
+    background.add_task(_rerun_job, run_id, site)
+    return {"run_id": run_id, "site": site, "status": "queued"}
+
+
+def _export(site_id: str) -> tuple[str, dict, dict | None]:
+    import sites
+    site = _site(site_id)
+    hit = _design(site)
+    return site, {**hit["rec"], "computed_at": hit["at"]}, sites.read_meta(site)
+
+
+def _file(body: str, media: str, name: str, inline: bool = False):
+    from fastapi.responses import Response
+    disp = "inline" if inline else "attachment"
+    return Response(body, media_type=media, headers={"Content-Disposition": f'{disp}; filename="{name}"'})
+
+
+@app.get("/sites/{site_id}/plan.html")
+def plan_html(site_id: str, download: bool = False):
+    """Printable plan report: summary, recommendation, pathways, monthly balance, network breakeven,
+    assumptions (source, verify, overridden), data sources, methodology."""
+    import exports
+    site, rec, meta = _export(site_id)
+    return _file(exports.plan_html(site, rec, meta), "text/html; charset=utf-8", exports.filename(site, "html"),
+                 inline=not download)
+
+
+@app.get("/sites/{site_id}/plan.json")
+def plan_json(site_id: str):
+    """The full /design result + assumptions + provenance, for scripts."""
+    import exports
+    site, rec, meta = _export(site_id)
+    return _file(json.dumps(exports.plan_bundle(site, rec, meta), indent=1, default=str), "application/json",
+                 exports.filename(site, "json"))
+
+
+@app.get("/sites/{site_id}/pathways.csv")
+def pathways_csv(site_id: str):
+    import exports
+    site, rec, _ = _export(site_id)
+    return _file(exports.pathways_csv(rec), "text/csv; charset=utf-8", exports.filename(site, "csv", "pathways"))
+
+
+@app.get("/sites/{site_id}/assumptions.csv")
+def assumptions_csv(site_id: str):
+    import exports
+    site = _site(site_id)
+    return _file(exports.assumptions_csv(site), "text/csv; charset=utf-8", exports.filename(site, "csv", "assumptions"))
+
+
 _SENS_CACHE: dict = {}
 
 
@@ -563,4 +712,5 @@ def _sensitivity_site(scenario: str, site: str) -> dict:
 @app.get("/health")
 def health():
     return {"ok": True, "time": datetime.now(timezone.utc).isoformat(),
-            "env": {k: bool(os.getenv(k)) for k in ENV_VARS}}
+            "env": {k: bool(os.getenv(k)) for k in ENV_VARS},
+            "data_dir": str(paths.DATA_DIR), "persistent": paths.PERSISTENT, "writable": paths.writable()}

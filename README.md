@@ -81,6 +81,31 @@ pytest -q
 
 Deployed on Railway (`Procfile`, `railway.json`). On first start with no data, the app simulates all four scenarios itself.
 
+## Deploying on Railway (persistent)
+
+Railway wipes the container filesystem on every redeploy. Without a volume, user-built sites, run outputs, the report cache and assumption overrides disappear. Everything the app writes goes under `DATA_DIR` (`paths.py`), so mount a volume there:
+
+1. Open the Railway project, then the Alpine service. Go to **Settings → Volumes → Add Volume** (or right-click the project canvas → **Volume**, then attach it to the service). Set **Mount path** to `/data`.
+2. Open the service's **Variables** tab → **New Variable**: `DATA_DIR` = `/data`.
+3. Redeploy (Deployments → ⋮ → Redeploy, or push to `main`).
+4. Open `https://<your-app>/health` and check for `"persistent": true, "writable": true, "data_dir": "/data"`.
+
+On the first start with an empty volume, the app copies the repo's shipped state into it: `outputs/runs/index.json`, `decisions_*.json`, `outputs/report_cache.json` and the example sites (`sites/*` plus their `web/geo` maps). It only copies files that are missing and never overwrites anything already on the volume. Layout: `/data/sites/<id>/`, `/data/geo/<id>.json`, `/data/outputs/{runs,overrides,report_cache.json}`, `/data/out/`. Built-in read-only data (`config/`, `data/`, `web/geo/lansing.json`) stays in the image. `/sites` lists the shipped sites and the volume's sites together; if both have the same id, the volume's copy wins. Without `DATA_DIR`, everything stays in the repo exactly as before.
+
+Environment variables:
+
+| Variable | Purpose |
+|---|---|
+| `ANTHROPIC_API_KEY` | `/ask` (Claude) |
+| `KEEWANO_API_KEY`, `KEEWANO_PAT`, `KEEWANO_MCP_URL`, `KEEWANO_EMAIL`, `KEEWANO_PROJECT_ID` | Keewano ingest, MCP and SQL |
+| `DATA_DIR` | Absolute path for writable state (the volume's mount path, `/data`) |
+| `ALLOWED_ORIGINS` | Optional comma-separated CORS allow-list (default `*`) |
+| `RATE_LIMITS_OFF` | `1` turns off per-IP rate limits (local dev and tests) |
+| `RATE_LIMIT_SITES` / `_ASK` / `_RERUN` / `_RUN` | Optional overrides as `N/SECONDS` (defaults `3/3600`, `20/600`, `4/3600`, `4/3600`) |
+| `MAX_BODY_BYTES` | Request body cap (default 32768) |
+
+Abuse guards (`guards.py`, no login): per-IP token buckets on `POST /sites`, `POST /ask`, `POST /sites/{id}/rerun|retry` and `POST /run` with push. The client IP comes from `X-Real-IP`, falling back to the first `X-Forwarded-For` hop. On top of that, at most 2 sites can build at once. A request over its limit gets `429` with a `Retry-After` header. A request that fails validation (4xx) gives its token back. The app logs one JSON line per request (method, path, status, ms, salted IP hash), and site builds log each step and any error.
+
 ## Repo map
 
 | Path | What |
@@ -90,6 +115,7 @@ Deployed on Railway (`Procfile`, `railway.json`). On first start with no data, t
 | `agent.py` | Daily agent and Ask |
 | `design.py` | Heat-reuse design and NPV comparison |
 | `server.py` | FastAPI: page and API |
+| `paths.py`, `guards.py` | Where state is written (`DATA_DIR`) and seeding; rate limits, body cap, access log |
 | `web/light.html` | The app (the original dark page is at `/classic`) |
 | `config/` | Every constant, with sources |
 | `data/` | Model outputs and validation |
